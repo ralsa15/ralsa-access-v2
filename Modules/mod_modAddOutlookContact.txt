@@ -1,0 +1,316 @@
+Option Compare Database
+ 
+' CI is for ContactInfo
+Enum CI
+ 
+    First
+    Last
+    Email
+    Alias
+    Company
+    JobTitle
+    Department
+    WorkPhone
+    HomePhone
+    CellPhone
+    WorkFax
+    WorkAddress
+    WorkCity
+    WorkState
+    WorkZip
+    WorkCountry
+    WebPage
+    Comments
+    FileAs
+ 
+End Enum
+ 
+ 
+    ' Each field map item maps between a field
+    ' name in the Access table and a property
+    ' name Access maps to Outlook and SharePoint
+    ' contact field info.
+Type FieldMap
+ 
+    Prop As String
+    Field As String
+ 
+End Type
+ 
+    ' This Varible lists all the properties that
+    ' can be mapped to Contact info. You fill
+    ' it with the corresponding field names from
+    ' your table.
+    Dim map(CI.FileAs) As FieldMap
+    'Dim map(CI.Department) As FieldMap
+    
+ 
+Public Sub MakeContacts()
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim strTable As String
+    Dim fm As FieldMap
+    Dim td As DAO.TableDef
+    Dim db As DAO.Database
+    Dim i As Integer
+     
+     
+    ' -----------------------------------------------
+    ' UPDATE THESE STRINGS
+    ' to match the table and field names in
+    ' your app. It is okay not to set some if you
+    ' don't have an equivalent.
+     
+    ' Set this to your table name
+    strTable = "lt_Contacts"
+     
+    ' Set these to your field names
+    map(CI.First).Field = "txtFirstName"
+    map(CI.Last).Field = "txtLastName"
+    map(CI.Email).Field = "txtEmailAddress"
+    map(CI.Alias).Field = "txtAlias"
+    map(CI.Company).Field = "txtCompany"
+    map(CI.JobTitle).Field = "txtJobTitle"
+    map(CI.Department).Field = "txtDepartment"
+    map(CI.WorkPhone).Field = "txtBusinessPhone"
+    map(CI.HomePhone).Field = "txtHomePhone"
+    map(CI.CellPhone).Field = "txtMobilePhone"
+    map(CI.WorkFax).Field = "txtFaxNumber"
+    map(CI.WorkAddress).Field = "txtAddress"
+    map(CI.WorkCity).Field = "txtCity"
+    map(CI.WorkState).Field = "txtStateProvince"
+    map(CI.WorkZip).Field = "txtZipPostalCode"
+    map(CI.WorkCountry).Field = "txtCountryRegion"
+    map(CI.WebPage).Field = "hyWebPage"
+    map(CI.Comments).Field = "txtNotes"
+    map(CI.FileAs).Field = "txtDisplayAs"
+    
+     
+    ' END OF STRINGS TO UPDATE
+    ' -----------------------------------------------
+     
+     
+    ' This the code to mark fields in
+    ' your local table with the correct
+    ' Outlook and SharePoint field names.
+    '
+    ' You shouldn't need to change this.
+    SetupContactProps
+    Set db = CurrentDb
+    Set td = db.TableDefs(strTable)
+     
+    ' Set the table level property that tells Access
+    ' this is a Contact table.
+    SetProp td, "WSSTemplateID", dbInteger, 105
+     
+    ' For each mapped field, set the correct
+    ' contacts property.
+    For i = 0 To CI.FileAs
+     
+    fm = map(i)
+    If Len(fm.Field) > 0 Then
+     
+    SetProp td.Fields(fm.Field), "WSSFieldID", dbText, fm.Prop
+     
+    End If
+     
+    Next
+ 
+ 
+End Sub
+ 
+' This code initializes the contact property
+' names that Access uses to map contact info
+' to SharePoint or Outlook.
+'
+' You shouldn't need to change this.
+Sub SetupContactProps()
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    map(CI.First).Prop = "FirstName"
+    map(CI.Last).Prop = "Title"
+    map(CI.Email).Prop = "Email"
+    map(CI.Alias).Prop = "Alias"
+    map(CI.Company).Prop = "Company"
+    map(CI.JobTitle).Prop = "JobTitle"
+    map(CI.Department).Prop = "Department"
+    map(CI.WorkPhone).Prop = "WorkPhone"
+    map(CI.HomePhone).Prop = "HomePhone"
+    map(CI.CellPhone).Prop = "CellPhone"
+    map(CI.WorkFax).Prop = "BusinessFaxNumber"
+    map(CI.WorkAddress).Prop = "BusinessAddressStreet"
+    map(CI.WorkCity).Prop = "BusinessAddressCity"
+    map(CI.WorkState).Prop = "BuinessAddressState"
+    map(CI.WorkZip).Prop = "BusinessAddressPostalCode"
+    map(CI.WorkCountry).Prop = "BusinessAddressCountry"
+    map(CI.WebPage).Prop = "WebPage"
+    map(CI.Comments).Prop = "Comments"
+    map(CI.FileAs).Prop = "Name"
+
+ 
+End Sub
+ 
+' This is a helper routine which sets a property
+' value first checking to see whether one already
+' exists.
+Sub SetProp(o As Object, strProp As String, dbType As DataTypeEnum, oValue As Variant)
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim p As DAO.Property
+     
+    On Error GoTo NotFound
+    Set p = o.Properties(strProp)
+    GoTo Found
+
+NotFound:
+     
+    Set p = CurrentDb.CreateProperty(strProp, dbType, oValue)
+    o.Properties.Append p
+
+Found:
+     
+    If p.Type = dbType Then
+     
+    p.Value = oValue
+     
+    Else
+    o.Properties.Delete (strProp)
+     
+    Set p = CurrentDb.CreateProperty(strProp, dbType, oValue)
+     
+    End If
+ 
+
+End Sub
+
+Sub OutlookContactFields()
+    ' Set up Outlook objects.
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+   Dim ol As New Outlook.Application
+   Dim olns As Outlook.Namespace
+   Dim cf As Outlook.MAPIFolder
+   Dim c As Outlook.ContactItem
+   Dim objItems As Outlook.Items
+   Dim Prop As Outlook.UserProperty
+
+   Set olns = ol.GetNamespace("MAPI")
+   Set cf = olns.GetDefaultFolder(olFolderContacts)
+   Set objItems = cf.Items
+   iNumContacts = objItems.Count
+      If iNumContacts <> 0 Then
+      For i = 1 To 2
+         If TypeName(objItems(i)) = "ContactItem" Then
+            Set c = objItems(i)
+            pCount = c.Companies
+            For j = 1 To pCount
+                c.Property(j).Name
+             Next j
+'            rst!FirstName = c.FirstName
+'            rst!LastName = c.LastName
+'            rst!Address = c.BusinessAddressStreet
+'            rst!City = c.BusinessAddressCity
+'            rst!State = c.BusinessAddressState
+'            rst!Zip_Code = c.BusinessAddressPostalCode
+'            ' Custom Outlook properties would look like this:
+'            ' rst!AccessFieldName = c.UserProperties("OutlookPropertyName")
+'            rst.Update
+         End If
+      Next i
+'      rst.Close
+      MsgBox "Finished."
+   Else
+      MsgBox "No contacts to export."
+   End If
+End Sub
+
+''''''''''''''''''''''''''
+'Added all below for testing/development
+'*************************
+
+Sub random()
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim i As Long
+    For i = 0 To CurrentDb.TableDefs("lt_Contacts").Properties.Count - 1
+        Debug.Print CurrentDb.TableDefs("lt_Contacts").Properties("WSSTemplateID").Name
+     Next i
+End Sub
+
+Sub TestContactSelect()
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    
+End Sub

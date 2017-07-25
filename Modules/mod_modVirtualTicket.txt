@@ -1,0 +1,160 @@
+Option Compare Database
+Option Explicit
+
+Sub DTU_NotesUpdate(iRec As Long)
+    '***    2/29/2016 - Considered filtering RecordSet
+    '        With rstJobLog
+    '           .Filter = "anAutoNumber = " & iRec
+    '           .Index = "PrimaryKey"
+    '***    2/29/2016 - Chose to remove parameter (iRec As Long) in favor of moving through tblJobLog
+    '           and testing Last Updated versus last DTU Run Date/Time
+    '***    3/1/2016 - Reverted plan back to Client running this function at the time of activity to minimize overload
+    '***    4/7/2016 - Created modified version on Scheduler for review before DTU based on Updated date.  Actually
+    '           adjusted this to accept the record ID so it process appropriately
+
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    On Error GoTo Err_Handler
+    
+    Dim dbServer As DAO.Database
+    Dim rstJobLog As DAO.Recordset
+    Dim rstActivity As DAO.Recordset
+    Dim rstDTU As DAO.Recordset
+    
+    Dim iSubRec As Long, JobNum As String
+
+    'Set dbServer = DBEngine.Workspaces(0).OpenDatabase("\\pdc\quality\AAA-Common\Regulatory Affairs\Regulatory Labeling\RALSA_be.accdb", False, False)
+    Set dbServer = CurrentDb
+    
+    Dim sqlJobLog As String, sqlActivity As String, sqlDTU As String
+    sqlJobLog = "SELECT * FROM tblJobLog WHERE anAutoNumber = " & iRec
+    
+    Set rstJobLog = dbServer.OpenRecordset(sqlJobLog)
+
+    With rstJobLog
+        '<
+        If Not .BOF And Not .EOF Then
+            iSubRec = .Fields("fkSubmissionID")
+                
+            'Pull Job Notes/Activity (Ascending date, chronology reversed as VT Note is built below
+            sqlActivity = "SELECT Format([Log_Activity].[dtActivityStamp],'m/d/yyyy') AS [Date], Log_Activity.txtSummary, " & _
+                    "Log_Activity.UserName, Log_Activity.fkJobID " & _
+                    "FROM Log_Activity " & _
+                    "WHERE Log_Activity.TransferVT = True and (Log_Activity.fkJobID = " & iRec & " Or Log_Activity.fkSubID = " & iSubRec & ") " & _
+                    "ORDER BY Log_Activity.dtActivityStamp Asc; "
+        
+            Set rstActivity = dbServer.OpenRecordset(sqlActivity)
+            With rstActivity
+                'Tests for Records in Log_Activity for Job
+                '<<
+                If Not (.BOF And .EOF) Then
+                    .MoveFirst
+                    Dim strNotes As String
+                    Do Until .EOF
+                        '<<<
+                        If strNotes = "" Then
+                            strNotes = .Fields("[Date]") & " " & .Fields("txtSummary")
+                         Else
+                            strNotes = .Fields("[Date]") & " " & .Fields("txtSummary") & Chr(13) & Chr(10) & strNotes
+                         End If
+                        '>>>
+                        .MoveNext
+                     Loop
+                 End If
+                '>>
+            End With
+            Set rstActivity = Nothing
+
+            'Record Job Notes/Activity in 'tmp_DailyUpload' for export
+            If strNotes <> "" Then
+            '<<
+            If Not IsNull(.Fields("txtJobNumber")) Then
+                JobNum = .Fields("txtJobNumber")
+                sqlDTU = "SELECT * FROM tmp_DailyUpload " & _
+                        "WHERE ([ItemNumber] = '" & .Fields("txtMaterialNum") & _
+                        "' AND [SubmissionID] = '" & .Fields("txtSubmissionEntry") & _
+                        "') OR ([Job Number] = " & JobNum & " );"
+             Else
+                sqlDTU = "SELECT * FROM tmp_DailyUpload " & _
+                        "WHERE [ItemNumber] = '" & .Fields("txtMaterialNum") & _
+                        "' AND [SubmissionID] = '" & .Fields("txtSubmissionEntry") & "' ;"
+             End If
+            '>>
+            
+            Set rstDTU = dbServer.OpenRecordset(sqlDTU)
+            
+            '<<
+'            If rstDTU.BOF And rstDTU.EOF And Not IsNull(JobNum) And Not JobNum = "" Then
+'                sqlDTU = "SELECT * FROM tmp_DailyUpload WHERE [Job Number] = " & JobNum & ";"
+'                Set rstDTU = dbServer.OpenRecordset(sqlDTU)
+'             End If
+            
+            If rstDTU.BOF And rstDTU.EOF Then
+                If Not IsNull(JobNum) And JobNum <> "" Then
+                    Set rstDTU = dbServer.OpenRecordset("tmp_DailyUpload")
+                    With rstDTU
+                        .AddNew
+                        .Fields("[Job Number]") = JobNum
+                        .Fields("Notes_Regulatory") = strNotes
+                        'Add "Final_RAApproval" and/or "UDI_RA_Verified" if applicable
+                        '<<<
+                        'If Not IsNull(rstJobLog.Fields("dtFinalApproval")) Then .Fields("Final_RAApproval") = rstJobLog.Fields("dtFinalApproval")
+                        'If Not IsNull(rstJobLog.Fields("fkUDI_RA_Verified")) Then .Fields("UDI_RA_Verified") = rstJobLog.Fields("fkUDI_RA_Verified")
+                        '.Fields("Status") = rstJobLog.Fields("txtJobStatus")
+                        '>>>
+                        .Fields("Is_Imported") = 1
+                        .Update
+                     End With
+                 End If
+             Else
+                With rstDTU
+                    .Edit
+                    If Not IsNull(.Fields("Job Number")) And JobNum <> "" Then .Fields("Job Number") = JobNum
+                    .Fields("Notes_Regulatory") = strNotes
+                    'Add "Final_RAApproval" and/or "UDI_RA_Verified" if applicable
+                    '<<<
+                    'If Not IsNull(rstJobLog.Fields("dtFinalApproval")) Then .Fields("Final_RAApproval") = rstJobLog.Fields("dtFinalApproval")
+                    'If Not IsNull(rstJobLog.Fields("fkUDI_RA_Verified")) Then .Fields("UDI_RA_Verified") = rstJobLog.Fields("fkUDI_RA_Verified")
+                    '>>>
+                    '.Fields("Status") = rstJobLog.Fields("txtJobStatus")
+                    .Fields("Is_Imported") = 1
+                    .Update
+                 End With
+             End If
+            '>>
+            End If
+            Set rstDTU = Nothing
+         End If
+        '>
+    End With
+    Set rstJobLog = Nothing
+
+All_Done:
+    On Error Resume Next
+    rstJobLog.Close
+    rstActivity.Close
+    dbServer.Close
+    
+    Set rstJobLog = Nothing
+    Set rstActivity = Nothing
+    Set dbServer = Nothing
+    
+    Exit Sub
+
+Err_Handler:
+    MsgBox "Err#: " & Err.Number & vbNewLine & "Desc: " & Err.Description
+    Resume All_Done
+
+End Sub

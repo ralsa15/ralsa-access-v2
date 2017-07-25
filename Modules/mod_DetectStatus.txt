@@ -1,0 +1,228 @@
+Option Compare Database
+Option Explicit
+Public TimeToClose As Long
+
+Sub IdleTimeDetected(ExpiredMinutes)
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim Msg As String
+    Dim newHour As Integer, newMinute As Integer, newSecond As Integer
+    
+    Select Case ExpiredMinutes
+        Case Is >= 60
+            If Not CurrentProject.AllForms("DetectIdleTime").IsLoaded Then
+                DoCmd.OpenForm "DetectIdleTime", acNormal, , , , acWindowNormal
+                DoCmd.RunCommand acCmdSizeToFitForm
+             End If
+            Form_DetectIdleTime.Visible = True
+            Form_DetectIdleTime.TimerInterval = 1000
+            
+            SystemClose  'Coded on Form_DetectIdleTime
+
+        Case Is < 60
+            If ExpiredMinutes > 135 Then
+                Application.Quit acQuitSaveNone
+             End If
+     End Select
+
+End Sub
+
+Sub FormTimer(TInterval As Long)
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+
+        ' IDLEMINUTES determines how much idle time to wait for before
+         ' running the IdleTimeDetected subroutine.
+         Const IDLEMINUTES = 60
+         Const IDLESTATUS = 5
+
+         Static PrevControlName As String
+         Static PrevFormName As String
+         Static ExpiredTime
+
+         Dim ActiveFormName As String
+         Dim ActiveControlName As String, vStatus As String
+         Dim ExpiredMinutes
+
+         On Error Resume Next
+
+         ' Get the active form and control name.
+
+         ActiveFormName = Screen.ActiveForm.Name
+         If Err Then
+            ActiveFormName = "No Active Form"
+            Err = 0
+         End If
+
+         ActiveControlName = Screen.ActiveControl.Name
+            If Err Then
+            ActiveControlName = "No Active Control"
+            Err = 0
+         End If
+
+         ' Record the current active names and reset ExpiredTime if:
+         '    1. They have not been recorded yet (code is running
+         '       for the first time).
+         '    2. The previous names are different than the current ones
+         '       (the user has done something different during the timer
+         '        interval).
+         If (PrevControlName = "") Or (PrevFormName = "") _
+           Or (ActiveFormName <> PrevFormName) _
+           Or (ActiveControlName <> PrevControlName) Then
+            PrevControlName = ActiveControlName
+            PrevFormName = ActiveFormName
+            ExpiredTime = 0
+            
+         Else
+            ' ...otherwise the user was idle during the time interval, so
+            ' increment the total expired time.
+            ExpiredTime = ExpiredTime + TInterval
+         End If
+
+         ' Does the total expired time exceed the IDLEMINUTES?
+         ExpiredMinutes = (ExpiredTime / 1000) / 60
+         
+         If ExpiredMinutes > IDLESTATUS Then
+            vStatus = "Idle"
+            Else
+            vStatus = "Active"
+         End If
+         
+         UserStatus ActiveFormName, ActiveControlName, CInt(ExpiredMinutes), vStatus
+         
+'         If ExpiredMinutes >= IDLEMINUTES Then
+'            ' ...if so, then reset the expired time to zero...
+'            ExpiredTime = 0
+'            ' ...and call the IdleTimeDetected subroutine.
+'            IdleTimeDetected ExpiredMinutes
+'         End If
+
+End Sub
+
+Function UserStatus(ActiveFormName As String, ActiveControlName As String, ExpiredMinutes As Long, Status As String)
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim bForce As Boolean, iForce As Integer, Timeout As Integer
+    
+    'Capture the Username
+    Dim rstUser As Object, sUser As String
+    sUser = useLocalVar("lv_sUser")
+    Set rstUser = CurrentDb.OpenRecordset("SELECT * FROM tblUsers WHERE [txtUserID] = '" & sUser & "';")
+    
+    'Test that user is setup; Quits if not
+    If rstUser.BOF And rstUser.EOF Then
+        MsgBox "You are not a recognized user and this application will close.  Please contact Tim Weber x2847 to request user access.", vbCritical, "User not recognized"
+        Application.Quit acQuitSaveNone
+     End If
+    
+    'Defaults that the application will not be quit due to inactivity
+    bForce = False
+    
+    'Determine time of day; During business hours, extends the potential idletime before exit
+    Select Case Format(Now, "h:nn:ss AM/PM")
+        Case Is < #8:00:00 AM# '30 minutes prior to 8:00 AM
+            Timeout = 30
+        Case Is < #5:00:00 PM# '2 hours during business hours
+            Timeout = 120
+        Case Else               'After 5:00 PM, 30 minutes
+            Timeout = 30
+     End Select
+    
+    With rstUser
+        'Test user's Idle time against the allowance
+        If .Fields("iIdleTime").Value > Timeout Then
+            bForce = True
+            iForce = .Fields("iIdleTime").Value
+            Status = "Logout"
+        End If
+        
+        'Update the Users table
+        .Edit
+        .Fields("stCurrentForm") = ActiveFormName
+        .Fields("stCurrentField") = ActiveControlName
+        .Fields("iIdleTime") = ExpiredMinutes
+        If Not .Fields("txtUserStatus") = Status Then
+            Select Case Status
+                Case "Active"
+                    .Fields("txtUserStatus") = "Active"
+                Case "Login"
+                    .Fields("dtLastLogin") = Now()
+                    .Fields("txtUserStatus") = "Logged In"
+                    .Fields("strMachine") = useLocalVar("lv_sMachine")
+                    .Fields("strDBVersion") = useLocalVar("lv_sDBVersion")
+                Case "Logout"
+                    .Fields("dtLogout") = Now()
+                    .Fields("txtUserStatus") = "Logged Out"
+                    .Fields("dtPrevLogin") = .Fields("dtLastLogin")
+                Case "Idle"
+                    .Fields("txtUserStatus") = "Idle"
+                Case Else
+            End Select
+        End If
+        .Update
+        
+        'If user has been idle for more than the allowance, quits application
+        If bForce Then
+            IdleTimeDetected .Fields("iIdleTime").Value
+         End If
+        
+    End With
+    
+    rstUser.Close
+    Set rstUser = Nothing
+
+End Function
+
+Public Sub SystemClose()
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    TimeToClose = 10
+End Sub

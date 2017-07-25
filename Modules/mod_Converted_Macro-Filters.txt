@@ -1,0 +1,344 @@
+Option Compare Database
+
+'------------------------------------------------------------
+' Filters
+'
+'------------------------------------------------------------
+Function Filters()
+On Error GoTo Filters_Err
+
+    Beep
+    ' Macro can't be run from the navigation pane.
+    Exit Function
+
+
+Filters_Exit:
+    Exit Function
+
+Filters_Err:
+    MsgBox Error$
+    Resume Filters_Exit
+
+End Function
+
+
+'------------------------------------------------------------
+' Filters_ApplyFilterFavorite
+'
+'   Edited and Works (12/29/2015)
+'------------------------------------------------------------
+Function Filters_ApplyFilterFavorite(ByRef FilterControl As Control)
+On Error GoTo Filters_ApplyFilterFavorite_Err
+
+    Dim strFilterString As String, strSortString As String
+
+    With FilterControl '.CodeContextObject
+        If (IsNull(Screen.ActiveControl) Or Screen.ActiveControl = 0) Then
+            ' Clear Filters.
+            Filters_ClearFilter
+            Exit Function
+        End If
+        If (Screen.ActiveControl = -1) Then
+            ' Manage Filters.
+            Filters_Manage
+            Exit Function
+        End If
+        
+        On Error Resume Next
+            strFilterString = DLookup("[FilterString]", "lt_Filters", "ID = " & Screen.ActiveControl)
+                If Err Then
+                    strFilterString = ""
+                 End If
+                Err.Clear
+            strSortString = DLookup("[SortString]", "lt_Filters", "ID = " & Screen.ActiveControl)
+                If Err Then
+                    'strSortString = ""
+                 End If
+                Err.Clear
+        On Error GoTo Filters_ApplyFilterFavorite_Err
+        
+        ' Apply Filters
+        If strFilterString <> "" Then
+            strFilterString = MyFilter(FilterControl.Parent, strFilterString)
+'            TempVars.Add "FilterString", strFilterString
+            DoCmd.ApplyFilter "", strFilterString, ""
+         End If
+        If strSortString <> Null Then
+            strSortString = MyFilter(FilterControl.Parent, strSortString)
+            TempVars.Add "SortString", strSortString
+         End If
+        
+        
+'        If (Not IsNull(TempVars!FilterString)) Then
+'            DoCmd.ApplyFilter "", TempVars!FilterString, ""
+'        End If
+        If (CurrentProject.IsTrusted And Not IsNull(TempVars!SortString)) Then
+            .OrderBy = Nz(TempVars!SortString)
+        End If
+        If (CurrentProject.IsTrusted) Then
+            .Parent.OrderByOn = Not IsNull(TempVars!SortString)
+        End If
+'        TempVars.Remove "FilterString"
+        TempVars.Remove "SortString"
+    End With
+
+
+Filters_ApplyFilterFavorite_Exit:
+    Exit Function
+
+Filters_ApplyFilterFavorite_Err:
+    MsgBox Error$
+    Resume Filters_ApplyFilterFavorite_Exit
+
+End Function
+
+'------------------------------------------------------------
+' Rewrite of the Filters_New Macro
+'
+'------------------------------------------------------------
+Function Filters_New(ByRef MeFrm As Form)
+On Error GoTo Filters_New_Err
+
+    With MeFrm
+        'Check if Filtered
+        If Not MeFrm.FilterOn Or MeFrm.OrderByOn Then
+            DoCmd.Beep
+            MsgBox "No filter or sort to save."
+            Exit Function
+         End If
+        'create variables
+        Dim ObjectType As String, ObjectName As String, FilterString As String, SortString As String
+        ObjectType = Application.CurrentObjectType
+        ObjectName = Application.CurrentObjectName
+        FilterString = .Filter
+        SortString = .OrderBy
+        
+        Dim arrOpenArgs As String
+        arrOpenArgs = ObjectType & "|" & ObjectName & "|" & FilterString & "|" & SortString
+        
+        'Open the Filter Details Form
+        DoCmd.OpenForm "frm_FilterDetails", acNormal, "", "", acAdd, acDialog, arrOpenArgs
+        DoCmd.Requery "cboFilterFavorites"
+        
+        'NOTE:  If the filter is changed on the Save Filter Form while saving, it will not apply
+        If CurrentProject.AllForms("frm_FilterDetails").IsLoaded Then
+            MeFrm.cboFilterFavorites = Forms!frm_FilterDetails.tbFilterString
+            DoCmd.Close acForm, "frm_FilterDetails"
+         End If
+    End With
+
+
+Filters_New_Exit:
+    Exit Function
+
+Filters_New_Err:
+    MsgBox Error$
+    Resume Filters_New_Exit
+
+End Function
+
+'------------------------------------------------------------
+' Filters_SetLastFilterID
+'
+'------------------------------------------------------------
+Function Filters_SetLastFilterID()
+On Error GoTo Filters_SetLastFilterID_Err
+
+    With CodeContextObject
+        ' Used in conjunction with NEW to set the value of the combo box when trusted.
+        TempVars.Add "LastFilterCreated", .ID
+    End With
+
+
+Filters_SetLastFilterID_Exit:
+    Exit Function
+
+Filters_SetLastFilterID_Err:
+    MsgBox Error$
+    Resume Filters_SetLastFilterID_Exit
+
+End Function
+
+
+'------------------------------------------------------------
+' Filters_Manage
+'
+'------------------------------------------------------------
+Function Filters_Manage()
+On Error GoTo Filters_Manage_Err
+
+    TempVars.Add "ObjectType", Application.CurrentObjectType
+    TempVars.Add "ObjectName", Application.CurrentObjectName
+    DoCmd.OpenForm "Filter Details", acNormal, "", "[Object Name]=[Application].[CurrentObjectName]", , acDialog
+    DoCmd.RunCommand acCmdRefresh
+    TempVars.Remove "ObjectType"
+    TempVars.Remove "ObjectName"
+
+Filters_Manage_Exit:
+    Exit Function
+
+Filters_Manage_Err:
+    MsgBox Error$
+    Resume Filters_Manage_Exit
+
+End Function
+
+
+'------------------------------------------------------------
+' Filters_SetupTempVars
+'
+'------------------------------------------------------------
+Function Filters_SetupTempVars()
+On Error GoTo Filters_SetupTempVars_Err
+
+    With CodeContextObject
+        TempVars.Add "ObjectType", Application.CurrentObjectType
+        TempVars.Add "ObjectName", Application.CurrentObjectName
+        TempVars.Add "FilterString", .Filter
+        TempVars.Add "SortString", .OrderBy
+    End With
+
+
+Filters_SetupTempVars_Exit:
+    Exit Function
+
+Filters_SetupTempVars_Err:
+    MsgBox Error$
+    Resume Filters_SetupTempVars_Exit
+
+End Function
+
+
+'------------------------------------------------------------
+' Filters_RemoveTempVars
+'
+'------------------------------------------------------------
+Function Filters_RemoveTempVars()
+On Error GoTo Filters_RemoveTempVars_Err
+
+    TempVars.Remove "ObjectType"
+    TempVars.Remove "ObjectName"
+    TempVars.Remove "FilterString"
+    TempVars.Remove "SortString"
+    TempVars.Remove "Order"
+    TempVars.Remove "LastFilterCreated"
+
+
+Filters_RemoveTempVars_Exit:
+    Exit Function
+
+Filters_RemoveTempVars_Err:
+    MsgBox Error$
+    Resume Filters_RemoveTempVars_Exit
+
+End Function
+
+
+'------------------------------------------------------------
+' Filters_ClearFilter
+'
+'------------------------------------------------------------
+Function Filters_ClearFilter()
+On Error GoTo Filters_ClearFilter_Err
+
+    With CodeContextObject
+        If (CurrentProject.IsTrusted And .Form.Name = "Asset List") Then
+            .Form!cboFilterFavorites = ""
+        End If
+        ' Clear Filter
+        DoCmd.ApplyFilter "", """""", ""
+        DoCmd.GoToControl "SearchBox"
+        DoCmd.SetProperty "SearchClear", acPropertyVisible, "0"
+        DoCmd.SetProperty "SearchGo", acPropertyVisible, "-1"
+        If (CurrentProject.IsTrusted) Then
+            .SearchBox = ""
+        End If
+        Exit Function
+    End With
+
+
+Filters_ClearFilter_Exit:
+    Exit Function
+
+Filters_ClearFilter_Err:
+    MsgBox Error$
+    Resume Filters_ClearFilter_Exit
+
+End Function
+
+
+'------------------------------------------------------------
+' Filters_CheckFilter
+'
+'------------------------------------------------------------
+Function Filters_CheckFilter()
+On Error GoTo Filters_CheckFilter_Err
+
+    With CodeContextObject
+        If (Not (.Form.FilterOn Or .Form.OrderByOn)) Then
+            Beep
+            MsgBox "You don't have a filter or sort to save.", vbOKOnly, "Save Filter"
+            End
+                End If
+    End With
+
+
+Filters_CheckFilter_Exit:
+    Exit Function
+
+Filters_CheckFilter_Err:
+    MsgBox Error$
+    Resume Filters_CheckFilter_Exit
+
+End Function
+
+Function OpenFilterFavorites(ByRef MeFrm As Form)
+
+    On Error GoTo ErrorHandler
+        
+    ' show the control and drop down the combo box
+    With MeFrm.cboFilterFavorites
+        .RowSource = "SELECT ID, FilterName FROM lt_Filters WHERE ObjectName = '" & MeFrm.Name & "'"
+        .Visible = True
+        .SetFocus
+        .Dropdown
+     End With
+            
+ExitProcedure:
+    Exit Function
+    
+ErrorHandler:
+    Resume ExitProcedure
+
+End Function
+
+Function MyFilter(MeFrm As Form, CurrentFilter As String) As String
+    Dim RecSource As String, NewFilter As String
+    Dim ToReplace As String, lngReplaceStart As Long, lngReplaceStrEnd As Long
+    RecSource = MeFrm.RecordSource
+            
+    If InStr(CurrentFilter, "' & UserID & '") Then
+        Dim strUserName As String
+        strUserName = useLocalVar("lv_sUsername")
+        CurrentFilter = Replace(CurrentFilter, " & UserID & ", strUserName)
+     End If
+
+'    lngReplaceStart = InStr(1, CurrentFilter, "[")
+'    lngReplaceStrEnd = InStr(lngReplaceStart, CurrentFilter, "]")
+'    ToReplace = Mid(CurrentFilter, lngReplaceStart, lngReplaceStrEnd - lngReplaceStart)
+'    MyFilter = Replace(CurrentFilter, ToReplace, "[" & RecSource)
+    MyFilter = CurrentFilter
+End Function
+
+Function ClearFilter(ByRef MeFrm As Form)
+    If CurrentProject.IsTrusted Then
+        MeFrm.cboFilterFavorites = ""
+     End If
+    
+    MeFrm.Filter = vbNullString
+    MeFrm.FilterOn = False
+    MeFrm.ApplySavedFilter.SetFocus
+    MeFrm.SearchClear.Visible = False
+    MeFrm.cboFilterFavorites.Visible = False
+
+End Function

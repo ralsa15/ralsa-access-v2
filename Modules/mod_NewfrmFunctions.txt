@@ -1,0 +1,1190 @@
+Option Compare Database
+Option Explicit
+
+Public OldStatus As Long, OldLabeler As Long, OldReviewer As Long
+
+
+'|*************************************************************************|
+'| ContactFilterForm
+'|      Used by a "Contact" drop-down control to filter by an associated "division" control
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      cDivision = (as Control) A dropdown control for Division selection with the division Primary key as represented data
+'|
+'|---------------------------------------------------------------
+
+Public Function ContactFilterForm(cDivision As Control) As String
+    Dim strDivReviewSQL As String
+    Dim numDivisionID As Long
+    
+    If Not IsNull(cDivision) Then
+        numDivisionID = cDivision.Column(1)
+        
+        ContactFilterForm = "SELECT qryContactGroups.[ID], qryContactGroups.[Contact Name], qryContactGroups.txtDivNumber " & _
+            "FROM qryContactGroups " & _
+            "WHERE (((qryContactGroups.iDivision)= " & numDivisionID & ")) " & _
+            "ORDER BY qryContactGroups.[File As]; "
+     Else
+        ContactFilterForm = "SELECT DISTINCT qryContactGroups.ID, qryContactGroups.[Contact Name], qryContactGroups.[File As] " & _
+            "FROM qryContactGroups " & _
+            "WHERE (((qryContactGroups.iDivision)>0)) " & _
+            "ORDER BY qryContactGroups.[File As]; "
+     End If
+
+    'Debug.Print ContactFilterForm
+
+End Function
+
+
+'|*************************************************************************|
+'| SaveSubmission
+'|      Called to save changes made to data on a form
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      frm =   (as Form) A form with data to test for and save any changes
+'|
+'|---------------------------------------------------------------
+Function SaveSubmission(frm As Form)
+
+    On Error GoTo funcError
+    
+    If frm.Dirty = True Then
+        DoCmd.Save
+     End If
+    
+    Exit Function
+funcError:
+    DoCmd.Beep
+    MsgBox "Error#: " & Err.Number & vbNewLine & "Error: " & Err.Description, vbOKOnly, "Error Saving"
+   
+End Function
+
+
+'|*************************************************************************|
+'| copyExcel
+'|      Called by the "NewFormSubmission" and "NewSubmitItems" forms to transfer data from
+'|      a RA-00001-F-00003 Microsoft Excel workbook
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+Sub copyExcel()
+
+    Dim appExcel As Object
+    Dim wkbBook As Excel.Workbook, wksSheet As Excel.Worksheet
+    
+    On Error Resume Next
+    Set appExcel = GetObject(, "Excel.Application")
+    If Err Then
+        MsgBox "Please start Excel and open the F3 you want to copy", vbCritical, "Error!"
+        GoTo Closing
+        Err.Clear
+     End If
+
+    Set wkbBook = appExcel.ActiveWorkbook
+    Debug.Print wkbBook.Name
+    Set wksSheet = wkbBook.Sheets("RA-00001-F-00003")
+    If Err Then
+        MsgBox "Please open the F3 you want to copy, and verify sheet title 'RA-00001-F-00003'", vbCritical, "Error!"
+        GoTo Closing
+        Err.Clear
+     End If
+    
+    Dim lngRows As Long
+    Dim lngJobNumCol As Long
+    Dim lngMaterCol As Long
+    Dim lngNameCol As Long
+    
+    'Searches the headers row (3) for the correct column number
+    lngJobNumCol = wksSheet.Range("A3:ZZ3").Find("Marketing*WO number").Column
+    lngMaterCol = wksSheet.Range("A3:ZZ3").Find("Item Number").Column
+    lngNameCol = wksSheet.Range("A3:ZZ3").Find("Description").Column
+    lngRows = wksSheet.UsedRange.Rows.Count - 3
+    
+    Dim strMat As String, strNam As String, strJobNum As String
+    Dim rsMats As DAO.Recordset
+    Dim Duplicates As New Collection, dupe As Variant
+    
+    Set rsMats = CurrentDb.OpenRecordset("lt_SubmitMaterials")
+    rsMats.Index = "Material"
+    
+    
+    Dim i As Long
+    For i = 1 To lngRows
+        
+        'Replaces a non-breaking space with a traditional space, and trims the value
+        strMat = Trim(Replace(wksSheet.Cells(3 + i, lngMaterCol).Value, Chr(160), Chr(32)))
+        strNam = Trim(Replace(wksSheet.Cells(3 + i, lngNameCol).Value, Chr(160), Chr(32)))
+        strJobNum = Trim(Replace(wksSheet.Cells(3 + i, lngJobNumCol).Value, Chr(160), Chr(32)))
+        
+        If strMat <> "" And strNam <> "" Then
+            'Searches the pulled list for existing entry of the item; Adds if new, captures if duplicate for later display
+            rsMats.Seek "=", strMat
+            If rsMats.NoMatch Then
+                rsMats.AddNew
+                    rsMats!txtMaterial = strMat
+                    rsMats!txtJobName = strNam
+                    If strJobNum <> "" Then rsMats!txtJobNumber = strJobNum
+                rsMats.Update
+             Else
+                Duplicates.Add strMat
+             End If
+         End If
+     Next i
+
+    If Duplicates.Count > 0 Then
+        Dim MsgDuplicates As String
+        MsgDuplicates = "Duplicate record(s) submitted for the following item(s) have been removed: "
+        For i = 1 To Duplicates.Count
+            MsgDuplicates = MsgDuplicates & vbNewLine & Duplicates(i)
+         Next i
+        MsgBox MsgDuplicates, vbCritical, "Duplicates Removed"
+        Set Duplicates = Nothing
+     End If
+
+    Set rsMats = Nothing
+    
+Closing:
+    Set wksSheet = Nothing
+    Set wkbBook = Nothing
+    Set appExcel = Nothing
+
+End Sub
+
+
+'|*************************************************************************|
+'| SaveAndCloseForm
+'|      Called when saving and closing a form - tests for and saves any changes made.
+'|      Also calls the "RequeryForm" function to refresh other open forms in the client
+'|
+'|  Functions Called:
+'|      RequeryForm
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      frmMe = (as Form) A form with data to test for and save any changes
+'|
+'|---------------------------------------------------------------
+Sub SaveAndCloseForm(frmMe As Form)
+
+    On Error GoTo ErrorFail
+    
+    If frmMe.Dirty = True Then 'Save Changes
+        frmMe.Dirty = False 'DoCmd.Save acForm, frmMe.Name
+     End If
+
+ResumeSave:
+    DoCmd.Close acForm, frmMe.Name
+    RequeryForm
+    Exit Sub
+ErrorFail:
+    If Err Then
+        MsgBox "Error: " & Err.Number & vbNewLine & "Description: " & Err.Description
+     End If
+    
+    Resume ResumeSave
+End Sub
+
+
+'|*************************************************************************|
+'| CancelAndCloseForm
+'|      Called when cancelling changes to data on a form; Also calls the "RequeryForm"
+'|      function to refresh other open forms in the client
+'|
+'|  Functions Called:
+'|      RequeryForm
+'|      EndChangeTrack
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      frmMe = (as Form) A form with data to test for and save any changes
+'|
+'|---------------------------------------------------------------
+Sub CancelAndCloseForm(frmMe As Form)
+    On Error GoTo ErrorFail
+    
+    If frmMe.Dirty = True Then 'Undo Changes
+        frmMe.Undo
+     End If
+    EndChangeTrack
+ResumeClose:
+    DoCmd.Close acForm, frmMe.Name
+    RequeryForm
+    Exit Sub
+ErrorFail:
+    If Err <> 2501 Then
+        MsgBox "Error: " & Err.Number & vbNewLine & "Descr: " & Err.Description
+     Resume ResumeClose
+     Else: Exit Sub
+     End If
+    
+End Sub
+
+
+'|*************************************************************************|
+'| SubActivityValidation
+'|      Validates activity on a submission
+'|
+'|  Returns:
+'|      An array (as string) of errors for display
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      SubmissionForm = (as Form) The submission form to test
+'|
+'|---------------------------------------------------------------
+Function SubActivityValidation(ByRef SubmissionForm As Form) As String
+
+    Dim cltValidations As Collection, vError As Variant
+    Set cltValidations = New Collection
+    
+    With SubmissionForm
+    Dim bReason As Boolean
+        bReason = IsNull(.cbActReason)
+        
+    Select Case .cbAction
+        Case 6 'Reassign
+            Dim bDivReviewer As Boolean, bRaReviewer As Boolean
+            bRaReviewer = .cbAssignedTo.Value <> .cbAssignedTo.OldValue
+
+            If bDivReviewer Or bRaReviewer Then
+             Else
+                cltValidations.Add "No Reassignment present."
+             End If
+
+        Case 4 'Returned To
+            If IsNull(.cbSentTo) Or .cbSentTo = vbNullString Then cltValidations.Add "Indicate to whom form was sent/returned."
+            If .cbExtReason.Visible = True And IsNull(.cbExtReason) Then
+                cltValidations.Add "'Extended Reason' must be populated."
+             End If
+
+        Case 3 'Approve
+            If IsNull(.cbMedDeviceClass) Or .cbMedDeviceClass = 6 Or .cbMedDeviceClass < 1 Then cltValidations.Add "Medical Device Class must be determined to approve form submission."
+        Case 5 'Reject -- Now Cancelled
+        Case 2 'Add Notes
+            bReason = False
+        Case 1 'Received
+        Case 8 'Update Details
+        Case Else
+            cltValidations.Add "Action Not Recognized."
+     End Select
+
+    If bReason Then cltValidations.Add "'Reason for Action' must be populated."
+    
+    End With
+
+    If cltValidations.Count > 0 Then
+        Dim strErrors As String
+        For Each vError In cltValidations
+            Debug.Print vError
+            strErrors = vError & vbNewLine & strErrors
+         Next
+        
+'        MsgBox "Unable to record activity: " & vbNewLine & vbNewLine & strErrors, , "Error"
+        SubActivityValidation = strErrors
+     End If
+
+End Function
+
+
+'|*************************************************************************|
+'| SummaryTest
+'|      Summarizes activity to display and record in Logs
+'|
+'|  Returns:
+'|      A string to summarize the activity being recorded
+'|
+'|  Functions Called:
+'|      useLocalVar
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      SubmissionForm = (as Form) Form with activity to summarize
+'|
+'|---------------------------------------------------------------
+Function SummaryTest(ByRef SubmissionForm As Form) As String
+
+    With SubmissionForm
+    Select Case .cbAction
+        Case 6 'Reassign
+            Dim bRaReviewer As Boolean
+            bRaReviewer = .cbAssignedTo.Value <> .cbAssignedTo.OldValue
+
+            If bRaReviewer And SubmissionForm.chkFloodJobs Then
+                SummaryTest = "RA Form & Art Review assigned to " & .cbAssignedTo.Column(1)
+             ElseIf bRaReviewer Then
+                SummaryTest = .cbAction.Column(2) & " " & .cbAssignedTo.Column(1)
+             End If
+
+        Case 4 'Returned To
+            SummaryTest = .cbActReason.Column(1) & _
+                IIf(.cbExtReason = "", "", ": " & .cbExtReason.Column(1)) & " - " & _
+                .cbAction.Column(2) & IIf(.cbSentTo = "", "", " " & .cbSentTo.Column(1)) & ""
+
+        Case 3 'Approve
+            SummaryTest = .cbAction.Column(2) & " " & .cbSentTo.Column(1)
+            .tbSubNotes = .tbSubNotes & .cbActReason.Column(1)
+        Case 5 'Reject -- Cancelled
+            SummaryTest = .cbAction.Column(2) & ": " & .cbActReason.Column(1) & _
+                IIf(.cbExtReason = "", "", ": " & .cbExtReason.Column(1)) & " - " & _
+                "Job Cancelled"
+        Case 2 'Add Notes
+            SummaryTest = "Add RA Notes (Form)"
+        Case 1 'Received
+            SummaryTest = .cbActReason.Column(1) & ", " & .cbAction.Column(2) & ": " & useLocalVar("lv_sUserName")
+        Case 8 'Update Notes
+            SummaryTest = .cbAction.Column(2)
+        Case Else
+            SummaryTest = "Action Not Recognized."
+     End Select
+
+    If Right(SummaryTest, 2) = ": " Then SummaryTest = Left(SummaryTest, Len(SummaryTest) - 2)
+    
+    If .tbSubNotes <> "" Then
+        .chkIncludeNotesVT.Enabled = True
+     End If
+
+    If .chkIncludeNotesVT Then
+        Select Case .cbAction
+            Case 2, 8
+                If Not IsNull(.tbSubNotes) Then
+                    SummaryTest = .tbSubNotes
+                 End If
+            Case 1, 3, 4, 5, 6
+                SummaryTest = SummaryTest & "; " & .tbSubNotes
+         End Select
+     End If
+    If Right(SummaryTest, 2) = "; " Then SummaryTest = Left(SummaryTest, Len(SummaryTest) - 2)
+    
+    .tbVtNote = SummaryTest
+    
+    End With
+
+End Function
+
+
+'|*************************************************************************|
+'| ChangeRecordSource
+'|      Changes the source of a list using parameters designated on the form
+'|
+'|  Functions Called:
+'|      MyFilter (Converted Macro-Filters)
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      MeFrm = (as Form) Form with list to change it's source
+'|
+'|  Other notes:
+'|      Shared between Submissions List and Jobs List
+'|---------------------------------------------------------------
+
+Sub ChangeRecordSource(ByRef MeFrm As Form)
+    Dim CurFilter As String, NewFilter As String
+    CurFilter = MeFrm.Filter
+    
+    Dim strRecordSource As String, strNewRecordSource As String
+    strRecordSource = MeFrm.RecordSource
+    
+    Select Case Left(strRecordSource, 7)
+        Case "qryJobs"
+            strNewRecordSource = "qryJobs"
+        Case "qrySubm"
+            strNewRecordSource = "qrySubmissions"
+        Case Else
+         Exit Sub
+     End Select
+    
+    If MeFrm.chkApproved And MeFrm.chkRejected Then
+        MeFrm.RecordSource = strNewRecordSource
+     ElseIf MeFrm.chkApproved Then
+        MeFrm.RecordSource = strNewRecordSource & "Approved"
+     ElseIf MeFrm.chkRejected Then
+        MeFrm.RecordSource = strNewRecordSource & "Rejected"
+     Else
+        MeFrm.RecordSource = strNewRecordSource & "Active"
+     End If
+
+    If CurFilter <> "" Then
+        CurFilter = Replace(CurFilter, strRecordSource, MeFrm.RecordSource) 'Converted Macro-Filters
+        NewFilter = MyFilter(MeFrm, CurFilter)
+     End If
+    If NewFilter <> "" Then
+        MeFrm.Filter = NewFilter
+        MeFrm.FilterOn = True
+     End If
+End Sub
+
+
+'|*************************************************************************|
+'| RequeryForm
+'|      Requeries all forms open within the client when closing a form
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+Function RequeryForm()
+
+    Dim SelectedRecord As String
+    On Error GoTo Err_Handler
+    Dim ReqForm As Form
+    For Each ReqForm In Application.Forms
+        Debug.Print ReqForm.Name
+        SelectedRecord = ReqForm.CurrentRecord
+        ReqForm.Requery '.Refresh (changed 6/21/2016)
+        DoCmd.GoToRecord acActiveDataObject, , acGoTo, SelectedRecord
+     Next
+Err_Handler:
+    Exit Function
+End Function
+
+
+'|*************************************************************************|
+'| UpdateListTextFields
+'|      Updates the Text Fields on the Submissions and Jobs Tables to allow for faster querys (eliminates sub-Queries)
+'|          Three Change Types:
+'|          1)  Submission
+'|          2)  Jobs Associated with Submission
+'|          3)  Single Job
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      ChangeType = (as Long) Determines which change type to update
+'|      ChangeID = (as Long) The foreign key of either the job or submission to update
+'|
+'|---------------------------------------------------------------
+Sub UpdateListTextFields(ChangeType As Long, ChangeID As Long)
+
+    Dim Updates As Long, i As Long
+    
+    Dim sqlUpdates As Collection
+    Set sqlUpdates = New Collection
+    
+    With sqlUpdates
+        Select Case ChangeType
+            Case 1  'Submission
+                .Add "UPDATE tblSubmissions INNER JOIN qryExtendContacts ON tblSubmissions.fkInitiator = qryExtendContacts.ID " & _
+                    "SET tblSubmissions.txtInitiator = qryExtendContacts.[Contact Name] " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkInitiator <> 0 AND tblSubmissions.fkInitiator Is Not Null)"
+                .Add "UPDATE tblSubmissions INNER JOIN qryExtendContacts ON tblSubmissions.fkApproverQA = qryExtendContacts.ID " & _
+                    "SET tblSubmissions.txtApproverQA = qryExtendContacts.[Contact Name] " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkApproverQA <> 0 OR tblSubmissions.fkApproverQA Is Not Null)"
+                .Add "UPDATE tblSubmissions INNER JOIN qryExtendContacts ON tblSubmissions.fkDivReviewer = qryExtendContacts.ID " & _
+                    "SET tblSubmissions.txtDivReviewer = qryExtendContacts.[Contact Name] " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkDivReviewer <> 0 OR tblSubmissions.fkDivReviewer Is Not Null)"
+                .Add "UPDATE tblSubmissions INNER JOIN qryExtendContacts ON tblSubmissions.fkRaLabeler = qryExtendContacts.ID " & _
+                    "SET tblSubmissions.txtRaLabeler = qryExtendContacts.[Contact Name] " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkRaLabeler <> 0 OR tblSubmissions.fkRaLabeler Is Not Null)"
+            
+                .Add "UPDATE tblSubmissions INNER JOIN tblDivisions ON tblSubmissions.fkDivision = tblDivisions.ID " & _
+                    "SET tblSubmissions.txtDivisionCode = tblDivisions.txtDivNumber " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkDivision <> 0 OR tblSubmissions.fkDivision Is Not Null)"
+            
+                .Add "UPDATE tblSubmissions INNER JOIN tblJobTypes ON tblSubmissions.fkJobType = tblJobTypes.ID " & _
+                    "SET tblSubmissions.txtJobType = tblJobTypes.txtJobType " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkJobType <> 0 OR tblSubmissions.fkJobType Is Not Null)"
+            
+                .Add "UPDATE tblSubmissions INNER JOIN tblRequestForms ON tblSubmissions.fkRequestForm = tblRequestForms.ID " & _
+                    "SET tblSubmissions.txtRequestForm = tblRequestForms.stRequestForm " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkRequestForm <> 0 OR tblSubmissions.fkRequestForm Is Not Null)"
+            
+                .Add "UPDATE tblSubmissions INNER JOIN tblLanguages ON tblSubmissions.fkLanguages = tblLanguages.ID " & _
+                    "SET tblSubmissions.txtLanguages = tblLanguages.txtLangOption " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkLanguages <> 0 OR tblSubmissions.fkLanguages Is Not Null)"
+                .Add "UPDATE tblSubmissions INNER JOIN tblSubStatuses ON tblSubmissions.fkFormStatus = tblSubStatuses.ID " & _
+                    "SET tblSubmissions.txtFormStatus = tblSubStatuses.txtSubmissionStatus " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkFormStatus <> 0 OR tblSubmissions.fkFormStatus Is Not Null)"
+                .Add "UPDATE tblSubmissions INNER JOIN tbl_MedDeviceClass ON tblSubmissions.fkMedDeviceClass = tbl_MedDeviceClass.ID " & _
+                    "SET tblSubmissions.txtMedDeviceClass = tbl_MedDeviceClass.Medical_Device_Class " & _
+                    "WHERE tblSubmissions.anSubmissionID = " & ChangeID & " AND (tblSubmissions.fkMedDeviceClass <> 0 OR tblSubmissions.fkMedDeviceClass Is Not Null)"
+
+            Case 2  'Jobs of Submission
+                .Add "UPDATE tblJobLog INNER JOIN tblJobStatuses ON tblJobLog.fkJobStatus = tblJobStatuses.ID " & _
+                    "SET tblJobLog.txtJobStatus = tblJobStatuses.txtJobStatus " & _
+                    "WHERE tblJobLog.fkSubmissionID = " & ChangeID & " AND (tblJobLog.fkJobStatus <> 0 AND tblJobLog.fkJobStatus Is Not Null)"
+                .Add "UPDATE tblJobLog INNER JOIN qryExtendContacts ON tblJobLog.fkDivReviewer = qryExtendContacts.ID " & _
+                    "SET tblJobLog.txtDivReviewer = qryExtendContacts.[Contact Name] " & _
+                    "WHERE tblJobLog.fkSubmissionID = " & ChangeID & " AND (tblJobLog.fkDivReviewer <> 0 AND tblJobLog.fkDivReviewer Is Not Null)"
+                .Add "UPDATE tblJobLog INNER JOIN qryExtendContacts ON tblJobLog.fkRaLabeler = qryExtendContacts.ID " & _
+                    "SET tblJobLog.txtRaLabeler = qryExtendContacts.[Contact Name] " & _
+                    "WHERE tblJobLog.fkSubmissionID = " & ChangeID & " AND (tblJobLog.fkRaLabeler <> 0 AND tblJobLog.fkRaLabeler Is Not Null)"
+            
+            Case 3  'Single Job
+                .Add "UPDATE tblJobLog INNER JOIN tblJobStatuses ON tblJobLog.fkJobStatus = tblJobStatuses.ID " & _
+                    "SET tblJobLog.txtJobStatus = tblJobStatuses.txtJobStatus " & _
+                    "WHERE tblJobLog.anAutoNumber = " & ChangeID & " AND (tblJobLog.fkJobStatus <> 0 AND tblJobLog.fkJobStatus Is Not Null)"
+                .Add "UPDATE tblJobLog INNER JOIN qryExtendContacts ON tblJobLog.fkDivReviewer = qryExtendContacts.ID " & _
+                    "SET tblJobLog.txtDivReviewer = qryExtendContacts.[Contact Name] " & _
+                    "WHERE tblJobLog.anAutoNumber = " & ChangeID & " AND (tblJobLog.fkDivReviewer <> 0 AND tblJobLog.fkDivReviewer Is Not Null)"
+                .Add "UPDATE tblJobLog INNER JOIN qryExtendContacts ON tblJobLog.fkRaLabeler = qryExtendContacts.ID " & _
+                    "SET tblJobLog.txtRaLabeler = qryExtendContacts.[Contact Name] " & _
+                    "WHERE tblJobLog.anAutoNumber = " & ChangeID & " AND (tblJobLog.fkRaLabeler <> 0 AND tblJobLog.fkRaLabeler Is Not Null)"
+         
+         End Select
+
+        Updates = sqlUpdates.Count
+
+        For i = 1 To Updates
+            CurrentDb.Execute .Item(i), dbFailOnError
+         Next i
+     End With
+
+End Sub
+
+'|*************************************************************************|
+'| BeginChangeTrack
+'|      One of three functions used by forms to record changes being made. This records the original values.
+'|      Related functions are ChangeTrack and EndChangeTrack
+'|
+'|  Functions Called:
+'|      EndChangeTrack
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      MeForm = (as Form) The Access form for which changes need to be tracked
+'|      ObjectType = (as Long) An integer to represent what type of record is changing (1=Submission, 2=Job)
+'|
+'|---------------------------------------------------------------
+Function BeginChangeTrack(ByRef MeForm As Form, ObjectType As Long)
+
+    EndChangeTrack  'Clear anything old (left in error?)
+    
+    Dim ctrl As Control
+    Dim rstChanges As DAO.Recordset
+    Set rstChanges = CurrentDb.OpenRecordset("lt_Changes")
+    
+    Dim sqlTrack As String
+    With MeForm
+        For Each ctrl In .Controls
+            sqlTrack = ""
+            If ctrl.ControlType <> 127 Then
+                Select Case ctrl.ControlType
+                    Case 109, 111 '109=Text, 111=ComboBox
+                        If ctrl.Tag Like "*TrackSpecial*" And (ctrl.Visible = True Or ObjectType = 2) Then
+                            sqlTrack = "INSERT INTO lt_Changes ( fkObjectType, " & _
+                                    "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                                    "OldValue, txtOldDisplay, CtrlName ) " & _
+                                    "SELECT 2, tblJoblog.anAutoNumber, tblJoblog.txtJobNumber, " & _
+                                    "'" & ctrl.StatusBarText & "', tblJobLog.fkRaLabeler, " & _
+                                    "tblJobLog.txtRaLabeler, tblJobLog.fkRaLabeler, " & _
+                                    "tblJobLog.txtRaLabeler, " & _
+                                    Chr(34) & ctrl.Name & Chr(34) & " " & _
+                                    "FROM tblJobLog " & _
+                                    "WHERE tblJobLog.fkSubmissionID = " & MeForm.ObjectID
+                        ElseIf ctrl.Tag Like "*TrackStatus*" Then
+                            sqlTrack = "INSERT INTO lt_Changes ( fkObjectType, " & _
+                                    "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                                    "OldValue, txtOldDisplay, CtrlName ) " & _
+                                    "SELECT 2, tblJoblog.anAutoNumber, tblJoblog.txtJobNumber, " & _
+                                    "'" & ctrl.StatusBarText & "', tblJobLog.fkJobStatus, " & _
+                                    "tblJobLog.txtJobStatus, tblJobLog.fkJobStatus, " & _
+                                    "tblJobLog.txtJobStatus, " & _
+                                    Chr(34) & ctrl.Name & Chr(34) & " " & _
+                                    "FROM tblJobLog " & _
+                                    "WHERE tblJobLog.fkSubmissionID = " & MeForm.ObjectID
+                        ElseIf ctrl.Tag Like "*Track*" And IsNull(ctrl.Value) And (ctrl.Visible = True Or ObjectType = 2) Then
+                            sqlTrack = "INSERT INTO lt_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                                    "fkObjectID, txtObjectID, txtFieldName, txtNewDisplay, txtOldDisplay, CtrlName ) " & _
+                                    "SELECT Null, '', " & ObjectType & ", " & MeForm.ObjectID & ", " & _
+                                    Chr(34) & MeForm.ObjectText & Chr(34) & ", '" & ctrl.StatusBarText & "', " & Chr(34) & ctrl.Value & Chr(34) & ", " & _
+                                    Chr(34) & ctrl.Value & Chr(34) & ", " & Chr(34) & ctrl.Name & Chr(34)
+                        ElseIf ctrl.Tag Like "*TrackSingle*" And (ctrl.Visible = True Or ObjectType = 2) Then
+                            sqlTrack = "INSERT INTO lt_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                                    "fkObjectID, txtObjectID, txtFieldName, txtNewDisplay, txtOldDisplay, CtrlName ) " & _
+                                    "SELECT Null, '', " & ObjectType & ", " & MeForm.ObjectID & ", " & _
+                                    Chr(34) & MeForm.ObjectText & Chr(34) & ", '" & ctrl.StatusBarText & "', " & Chr(34) & Replace(ctrl.Value, Chr(34), "'") & Chr(34) & ", " & _
+                                    Chr(34) & Replace(ctrl.Value, Chr(34), "'") & Chr(34) & ", " & Chr(34) & ctrl.Name & Chr(34)
+                        ElseIf ctrl.Tag Like "*TrackCombo*" And (ctrl.Visible = True Or ObjectType = 2) Then
+                            sqlTrack = "INSERT INTO lt_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                                    "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                                    "OldValue, txtOldDisplay, CtrlName ) " & _
+                                    "SELECT Null, '', " & ObjectType & ", " & MeForm.ObjectID & ", " & _
+                                    Chr(34) & MeForm.ObjectText & Chr(34) & ", '" & ctrl.StatusBarText & "', " & Nz(ctrl.Column(0), 0) & ", " & _
+                                    Chr(34) & ctrl.Column(1) & Chr(34) & ", " & Nz(ctrl.Column(0), "Null") & ", " & Chr(34) & ctrl.Column(1) & Chr(34) & ", " & _
+                                    Chr(34) & ctrl.Name & Chr(34)
+                        Else
+                            sqlTrack = ""
+                         End If
+                    Case 106 ' 106=CheckBox
+                        If ctrl.Tag Like "*Track*" And IsNull(ctrl.Value) And (ctrl.Visible = True Or ObjectType = 2) Then
+                            sqlTrack = "INSERT INTO lt_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                                    "fkObjectID, txtObjectID, txtFieldName, txtNewDisplay, txtOldDisplay, CtrlName ) " & _
+                                    "SELECT Null, '', " & ObjectType & ", " & MeForm.ObjectID & ", " & _
+                                    Chr(34) & MeForm.ObjectText & Chr(34) & ", '" & ctrl.StatusBarText & "', '" & _
+                                    ctrl.Value & "', '" & ctrl.Value & "', " & _
+                                    Chr(34) & ctrl.Name & Chr(34)
+                         ElseIf ctrl.Tag Like "*TrackSingle*" And ctrl.Visible = True Then
+                            Dim Checked As Boolean
+                            Select Case ctrl.Value
+                                Case IsNull(ctrl.Value)
+                                    sqlTrack = "INSERT INTO lt_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                                            "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                                            "OldValue, txtOldDisplay, CtrlName ) " & _
+                                            "SELECT Null, '', " & ObjectType & ", " & MeForm.ObjectID & ", " & _
+                                            Chr(34) & MeForm.ObjectText & Chr(34) & ", '" & ctrl.StatusBarText & "', Null, " & _
+                                            "'', " & Chr(34) & "', Null, " & "'', " & Chr(34) & ctrl.Name & Chr(34)
+                                Case 0, -1
+                                    Checked = (ctrl.Value = -1)
+                                        sqlTrack = "INSERT INTO lt_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                                            "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                                            "OldValue, txtOldDisplay, CtrlName ) " & _
+                                            "SELECT Null, '', " & ObjectType & ", " & MeForm.ObjectID & ", " & _
+                                            Chr(34) & MeForm.ObjectText & Chr(34) & ", '" & ctrl.StatusBarText & "', " & ctrl.Value & ", " & _
+                                            Chr(34) & Checked & Chr(34) & ", " & ctrl.Value & ", " & _
+                                            Chr(34) & Checked & Chr(34) & ", " & Chr(34) & ctrl.Name & Chr(34)
+                             End Select
+                         End If
+                    Case 110 'ListBox
+                        If ctrl.Tag Like "*Track*" And IsNull(ctrl.Value) And (ctrl.Visible = True Or ObjectType = 2) Then
+                            sqlTrack = "INSERT INTO lt_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                                    "fkObjectID, txtObjectID, txtFieldName, txtNewDisplay, txtOldDisplay, CtrlName ) " & _
+                                    "SELECT Null, '', " & ObjectType & ", " & MeForm.ObjectID & ", " & _
+                                    Chr(34) & MeForm.ObjectText & Chr(34) & ", '" & ctrl.StatusBarText & "', '" & _
+                                    ctrl.Value & "', '" & ctrl.Value & "', " & _
+                                    Chr(34) & ctrl.Name & Chr(34)
+                         ElseIf ctrl.ItemsSelected.Count = 1 Then
+                            sqlTrack = "INSERT INTO lt_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                                    "fkObjectID, txtObjectID, txtFieldName, txtNewDisplay, txtOldDisplay, CtrlName ) " & _
+                                    "SELECT Null, '', " & ObjectType & ", " & MeForm.ObjectID & ", " & _
+                                    Chr(34) & MeForm.ObjectText & Chr(34) & ", '" & ctrl.StatusBarText & "', '" & _
+                                    ctrl.Value & "', '" & ctrl.Value & "', " & _
+                                    Chr(34) & ctrl.Name & Chr(34)
+                         ElseIf ctrl.ItemsSelected.Count > 1 Then
+                            
+                         End If
+                 End Select
+                If sqlTrack <> "" Then
+                    CurrentDb.Execute sqlTrack, dbFailOnError
+                 End If
+             End If
+         Next
+     End With
+End Function
+
+
+'|*************************************************************************|
+'| ChangeTrack
+'|      One of three functions used by forms to record changes being made. This records the new values.
+'|      Determines by the control type how to record the changes in the appropriate table
+'|      Related functions are BeginChangeTrack and EndChangeTrack
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      MeCtrl = (as Control) The control which has been changed.
+'|
+'|---------------------------------------------------------------
+Function ChangeTrack(ByRef MeCtrl As Control)
+
+    Dim sqlChange As String
+    
+    Select Case MeCtrl.ControlType
+        Case 109, 111 '109=Text, 111=ComboBox
+            If MeCtrl.Tag Like "*TrackSingle*" Then
+                sqlChange = "UPDATE lt_Changes SET txtNewDisplay = " & Chr(34) & Replace(Nz(MeCtrl.Value, Chr(34) & Chr(34)), Chr(34), "") & Chr(34) & _
+                            ", bRecordChange = False " & _
+                            "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34)
+            ElseIf MeCtrl.Tag Like "*TrackCombo*" Then
+                sqlChange = "UPDATE lt_Changes SET NewValue = " & Nz(MeCtrl.Value, "NULL") & _
+                            ", txtNewDisplay = " & Chr(34) & MeCtrl.Column(1) & Chr(34) & ", bRecordChange = False " & _
+                            "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34)
+            ElseIf MeCtrl.Tag Like "*TrackSpecial*" Then
+                If IsNull(MeCtrl) Then
+                    sqlChange = "UPDATE lt_Changes SET NewValue = OldValue, " & _
+                                "txtNewDisplay = txtOldDisplay, bRecordChange = False " & _
+                                "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34)
+                 Else
+                    sqlChange = "UPDATE lt_Changes SET NewValue = " & Nz(MeCtrl.Value, 0) & _
+                                ", txtNewDisplay = " & Chr(34) & MeCtrl.Column(1) & Chr(34) & ", bRecordChange = False " & _
+                                "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34)
+                 End If
+            ElseIf MeCtrl.Tag Like "*TrackStatus*" Then
+                If IsNull(MeCtrl) Or MeCtrl = "" Then
+                    sqlChange = "UPDATE lt_Changes SET NewValue = OldValue, " & _
+                                "txtNewDisplay = txtOldDisplay, bRecordChange = False " & _
+                                "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34)
+                 Else
+                    sqlChange = "UPDATE lt_Changes SET NewValue = " & Nz(MeCtrl.Value, 0) & _
+                                ", txtNewDisplay = " & Chr(34) & MeCtrl.Column(1) & Chr(34) & ", bRecordChange = False " & _
+                                "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34)
+                 End If
+             End If
+        Case 106 '106=CheckBox
+            If MeCtrl.Tag Like "*TrackSingle*" Then
+                Dim Checked As Boolean
+                Select Case MeCtrl.Value
+                    Case Null, 0
+                        Checked = False
+                    Case -1
+                        Checked = True
+                 End Select
+                sqlChange = "UPDATE lt_Changes SET NewValue = " & MeCtrl.Value & ", " & _
+                            "txtNewDisplay = " & Chr(34) & Checked & Chr(34) & " " & _
+                            "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34)
+             End If
+        Case 110
+            If MeCtrl.Tag Like "*TrackSingle*" And MeCtrl.ItemsSelected.Count = 1 Then
+                sqlChange = "UPDATE lt_Changes SET txtNewDisplay = " & Chr(34) & Replace(Nz(MeCtrl.Value, Chr(34) & Chr(34)), Chr(34), "") & Chr(34) & _
+                            ", bRecordChange = False " & _
+                            "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34)
+             ElseIf MeCtrl.Tag Like "*TrackSingle*" And MeCtrl.ItemsSelected.Count > 1 Then
+                Dim CtrlSelections As String, i As Long
+                For i = 0 To MeCtrl.ItemsSelected.Count - 1
+                    CtrlSelections = CtrlSelections & ";" & MeCtrl.ItemData(i)
+                 Next i
+                CtrlSelections = Right(CtrlSelections, Len(CtrlSelections) - 1)
+                sqlChange = "UPDATE lt_Changes SET txtNewDisplay = " & Chr(34) & Replace(Nz(CtrlSelections, Chr(34) & Chr(34)), Chr(34), "") & Chr(34) & _
+                            ", bRecordChange = False " & _
+                            "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34)
+             End If
+     End Select
+    
+    If sqlChange <> "" Then
+        CurrentDb.Execute sqlChange, dbFailOnError
+        
+        sqlChange = "UPDATE lt_Changes SET bRecordChange = True " & _
+                        "WHERE CtrlName = " & Chr(34) & MeCtrl.Name & Chr(34) & " AND " & _
+                        "(NewValue <> OldValue OR txtNewDisplay <> txtOldDisplay)" 'Removed "Not IsNull(txtNewDisplay) AND " &
+        CurrentDb.Execute sqlChange, dbFailOnError
+     End If
+End Function
+
+
+'|*************************************************************************|
+'| EndChangeTrack
+'|      One of three functions used by forms to record changes being made. This clears the temporary table which
+'|      tracks the old and new values
+'|      Related functions are BeginChangeTrack and ChangeTrack
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+Function EndChangeTrack()
+
+    Dim sqlClear As String
+    sqlClear = "DELETE * FROM lt_Changes"
+    
+    CurrentDb.Execute sqlClear, dbFailOnError
+    
+End Function
+
+
+'|*************************************************************************|
+'| RecActivity
+'|      Records activity information into appropriate Logs and finalizes data changes.
+'|
+'|  Functions Called:
+'|      SubActivityValidation   (NewfrmFunctions)
+'|      useLocalVar (myfunctions)
+'|      SummaryTest (NewfrmFunctions)
+'|      UpdateListTextFields    (NewfrmFunctions)
+'|      EndChangeTrack  (NewfrmFunctions)
+'|
+'|  Subs Called:
+'|      DTU_NotesUpdate (modVirtualTicket)
+'|      UpdateJobJL (NewfrmFunctions)
+'|      UpdateJobDU (NewfrmFunctions)
+'|
+'|  Arguments:
+'|      ActForm = (as Form)
+'|      SendToVT = (as Boolean)
+'|      *UpdateJobs = (as Boolean, optional)
+'|
+'|---------------------------------------------------------------
+Sub RecActivity(ByRef ActForm As Form, SendToVT As Boolean, Optional UpdateJobs As Boolean = False)
+
+    Dim strNoteBy As String, strSummary As String, lngUserID As Long
+    Dim strActivityID As String, dtTimeStamp As Date, dtActivity As Date, ctrl As Control
+    Dim StatusChange As String
+
+    On Error GoTo MyError
+    
+    Dim NewStatus As Long, NewLabeler As Long, NewDivReviewer As Long
+
+    Dim wrkSpace As DAO.Workspace
+    Set wrkSpace = DBEngine(0)
+
+    Dim strValidity As String
+    strValidity = SubActivityValidation(ActForm) 'NewfrmFunctions
+
+    If strValidity = "" Then
+
+        strNoteBy = useLocalVar("lv_sUserName")
+        lngUserID = useLocalVar("lv_iContactID")
+        dtTimeStamp = Now
+        dtActivity = Format(ActForm.tbActionDate, "M/D/YYYY h:mm:ss AM/PM")
+        strActivityID = Format(lngUserID, "000") & "." & Format(dtTimeStamp, "YYYYMMDDhhmmss")
+
+        If Format(dtTimeStamp, "m/d/yyyy") <> Format(dtActivity, "m/d/yyyy") Then
+            dtActivity = Format(dtActivity, "m/d/yyyy")
+         End If
+        
+        strSummary = SummaryTest(ActForm)
+        Debug.Print strSummary
+
+        Select Case ActForm.cbAction
+            Case 1, 3, 4, 5, 7, 9
+                StatusChange = ActForm.cbStatus.Column(1)
+            Case 2, 6, 8
+                StatusChange = ""
+         End Select
+
+        ActiveTransaction = True
+        wrkSpace.BeginTrans
+
+        '*** 7/13/2016  Added Submission ID and date activity recorded
+        If strSummary <> "" Then
+            Dim sqlLogAdd As String
+            sqlLogAdd = "INSERT INTO Log_Activity ( fkSubID, txtActivity, txtActivityID, " & _
+                        "txtReason, txtNewStatus, dtActivityStamp, fkUserID, UserName, txtSummary, TransferVT, " & _
+                        "txtSubmissionID, dtRecorded) " & _
+                        "SELECT '" & ActForm.anSubmissionID & "', '" & ActForm.cbAction.Column(1) & _
+                        "', '" & strActivityID & "', '" & ActForm.cbActReason.Column(1) & _
+                        "', " & Chr(34) & StatusChange & Chr(34) & " , '" & dtActivity & "', '" & lngUserID & _
+                        "', '" & strNoteBy & "', " & Chr(34) & strSummary & Chr(34) & ", " & SendToVT & _
+                        ", '" & ActForm.stSubmissionEntry & "', '" & dtTimeStamp & "'; "
+
+            Debug.Print sqlLogAdd
+        
+            CurrentDb.Execute sqlLogAdd, dbFailOnError
+         Else
+            GoTo ImFinished
+         End If
+        
+        Dim sqlFindID As String, rstFindID As DAO.Recordset
+        sqlFindID = "SELECT ID FROM Log_Activity WHERE txtActivityID = " & Chr(34) & strActivityID & Chr(34)
+        Set rstFindID = CurrentDb.OpenRecordset(sqlFindID)
+        
+        Dim fkActivityID As Long
+        fkActivityID = rstFindID.Fields("ID")
+        Set rstFindID = Nothing
+
+    '***********************
+
+        sqlLogAdd = "INSERT INTO Log_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                    "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                    "OldValue, txtOldDisplay ) " & _
+                    "SELECT " & fkActivityID & ", " & Chr(34) & strActivityID & Chr(34) & ", fkObjectType, " & _
+                    "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                    "OldValue, txtOldDisplay " & _
+                    "FROM lt_Changes " & _
+                    "WHERE lt_Changes.bRecordChange = True"
+        
+        CurrentDb.Execute sqlLogAdd, dbFailOnError
+    '***********************
+    
+        'If Notes are populated, records them in Log_RaSubNotes
+        If Not IsNull(ActForm.tbSubNotes) Then
+
+            Dim sqlSubNotes As String
+            sqlSubNotes = "INSERT INTO [Log_RaSubNotes] ( fkSubID, dtSubNote, txtNote, txtNoteBy, dtRecorded, fkActivityID) " & _
+                            "SELECT " & ActForm.anSubmissionID & ", '" & dtActivity & "', " & Chr(34) & ActForm.tbSubNotes & Chr(34) & _
+                            ", '" & strNoteBy & "', '" & dtTimeStamp & "', " & fkActivityID & " ; "
+            
+            CurrentDb.Execute sqlSubNotes, dbFailOnError
+         End If
+    
+        ActForm.dtStatusDate = dtTimeStamp
+        ActForm.fkFormStatus = ActForm.cbStatus.Value
+    
+        If CurrentProject.AllForms("frmSubmissionDetails").IsLoaded Then
+            Forms!frmSubmissionDetails.Recalc
+        End If
+        
+        wrkSpace.CommitTrans
+        ActiveTransaction = False
+        
+        'Add Notes to DTU for Updates (only for jobs already queued to load)
+        Dim rstForDTU As DAO.Recordset
+        Dim sqlForDTU As String
+        
+        sqlForDTU = "SELECT tblJobLog.anAutoNumber, tblJobLog.txtJobNumber FROM tblJobLog WHERE tblJobLog.fkSubmissionID = " & ActForm.anSubmissionID & ";"
+        Set rstForDTU = CurrentDb.OpenRecordset(sqlForDTU)
+        
+        With rstForDTU
+            If Not .BOF And Not .EOF Then
+                .MoveFirst
+                Do While Not .EOF
+                    DTU_NotesUpdate !anAutoNumber ', ActForm.cbAction  'modVirtualTicket
+                    UpdateJobDU !anAutoNumber, fkActivityID
+                    UpdateJobJL !anAutoNumber, fkActivityID
+                 .MoveNext
+                 Loop
+             End If
+         End With
+        
+        rstForDTU.Close
+        Set rstForDTU = Nothing
+        
+        If UpdateJobs Then
+            Select Case NewStatus
+                Case 0 'No form status change
+                Case 1 'Received Form
+                    NewStatus = 24
+                Case 2 'Cancelled Form
+                    NewStatus = 3
+                Case 3 'Approved Form
+                    NewStatus = 30
+                Case 4 'Returned/Sent Form
+                    If Not IsNull(ActForm.cbFloodJobStatus) Then
+                        NewStatus = ActForm.cbFloodJobStatus  'Represents status selected by user to flood to forms
+                     Else
+                        NewStatus = 0
+                     End If
+            End Select
+            UpdateListTextFields 2, ActForm.anSubmissionID
+         End If
+        
+     End If
+ImFinished:
+    EndChangeTrack
+    wrkSpace.Close
+    Set wrkSpace = Nothing
+    Exit Sub
+MyError:
+    MsgBox "Failed to record Submission Activity." & vbNewLine & _
+        "Error: " & Err.Number & vbNewLine & "Descrp: " & Err.Description & vbNewLine & _
+        strValidity, vbCritical, "ERROR"
+    
+    On Error Resume Next
+    If ActiveTransaction Then
+        wrkSpace.Rollback
+        ActiveTransaction = False
+     End If
+
+    Resume ImFinished
+End Sub
+
+
+'|*************************************************************************|
+'| UpdateJobDU
+'|      Updates the Daily Upload table when changes are made to Job(s)
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      JobID = (as Long)
+'|      fkActivityID = (as Long)
+'|
+'|---------------------------------------------------------------
+Sub UpdateJobDU(JobID As Long, fkActivityID As Long) ', Optional Status As Long, Optional Labeler As Long, Optional DivReviewer As Long)
+
+    Dim sqlUpdates As String, rstUpdates As DAO.Recordset
+    sqlUpdates = "SELECT Log_Changes.* FROM Log_Changes WHERE Log_Changes.fkActivityID = " & fkActivityID
+    Set rstUpdates = CurrentDb.OpenRecordset(sqlUpdates)
+    
+    Dim sqlJob As String, rstJob As DAO.Recordset
+    sqlJob = "SELECT tblJobLog.* FROM tblJobLog WHERE tblJobLog.anAutoNumber = " & JobID
+    Set rstJob = CurrentDb.OpenRecordset(sqlJob)
+
+
+    Dim sqlDailyUpload As String, rstDailyUpload As DAO.Recordset
+
+    If Not (rstUpdates.BOF And rstUpdates.EOF) Then 'Has Changes
+        If IsNull(rstJob!txtJobNumber) Or rstJob!txtJobNumber = "" Then
+            sqlDailyUpload = "SELECT * FROM tmp_DailyUpload WHERE tmp_DailyUpload.[ItemNumber] = " & Chr(34) & rstJob!txtMaterialNum & Chr(34) & _
+            "AND tmp_DailyUpload.SubmissionID = " & Chr(34) & rstJob!txtSubmissionEntry & Chr(34)
+        Else
+            sqlDailyUpload = "SELECT * FROM tmp_DailyUpload WHERE tmp_DailyUpload.[Job Number] = " & rstJob.Fields("txtJobNumber")
+        End If
+        
+        Set rstDailyUpload = CurrentDb.OpenRecordset(sqlDailyUpload)
+
+        If rstDailyUpload.BOF And rstDailyUpload.EOF Then
+            Set rstDailyUpload = CurrentDb.OpenRecordset("tmp_DailyUpload")
+            rstDailyUpload.AddNew
+            rstDailyUpload![Job Number] = rstUpdates!txtObjectID
+            rstDailyUpload!anAutonumberJob = rstUpdates!fkObjectID
+         Else
+            rstDailyUpload.Edit
+         End If
+
+        rstUpdates.MoveFirst
+        Do While Not rstUpdates.EOF
+        
+            With rstUpdates
+                Select Case !txtFieldName   'Updates DTU with new information
+                    Case "Vendor Code"  'Form Change
+                        rstDailyUpload!Vendor_Code = !txtNewDisplay
+                    Case "Form Type"    'Form Change
+                        rstDailyUpload!Form_Type = !txtNewDisplay
+                    Case "Medical Device Class" 'Form Change
+                        rstDailyUpload!Medical_Device_Class = !txtNewDisplay
+                    Case "Language" 'Form Change
+                        rstDailyUpload!Languages = !txtNewDisplay
+                    Case "Division Reviewer"
+                        rstDailyUpload!ProductManager = !txtNewDisplay
+                    Case "Item"
+                        rstDailyUpload!ItemNumber = !txtNewDisplay
+                    Case "Art Reviewer", "RA Labeler"
+                        rstDailyUpload!RA_Labeler = !txtNewDisplay
+                    Case "VT Status"
+                        rstDailyUpload!Status = !txtNewDisplay
+                    Case "Job Name"
+                        rstDailyUpload![Job Name] = !txtNewDisplay
+                 End Select
+             End With
+            
+            rstUpdates.MoveNext
+         Loop
+        rstDailyUpload.Update
+        rstDailyUpload.Close
+     End If
+    
+    rstUpdates.Close
+    rstJob.Close
+    
+    Set rstUpdates = Nothing
+    Set rstDailyUpload = Nothing
+    Set rstJob = Nothing
+
+End Sub
+
+
+'|*************************************************************************|
+'| UpdateJobJL
+'|      Updates the Job table when changes are made to Job(s)
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      JobID = (as Long)
+'|      fkActivityID = (as Long)
+'|
+'|---------------------------------------------------------------
+Sub UpdateJobJL(JobID As Long, fkActivityID As Long) ', Optional Status As Long, Optional Labeler As Long, Optional DivReviewer As Long)
+
+    Dim sqlUpdates As String, rstUpdates As DAO.Recordset
+    sqlUpdates = "SELECT Log_Changes.* FROM Log_Changes WHERE Log_Changes.fkActivityID = " & fkActivityID
+    Set rstUpdates = CurrentDb.OpenRecordset(sqlUpdates)
+    
+    Dim sqlJob As String, rstJob As DAO.Recordset
+    sqlJob = "SELECT tblJobLog.* FROM tblJobLog WHERE tblJobLog.anAutoNumber = " & JobID
+    Set rstJob = CurrentDb.OpenRecordset(sqlJob)
+
+
+    If Not (rstUpdates.BOF And rstUpdates.EOF) Then 'Has Changes
+       rstJob.Edit
+     
+    rstUpdates.MoveFirst
+        Do While Not rstUpdates.EOF
+        
+            With rstUpdates
+                Select Case !txtFieldName   'Updates DTU with new information
+'                    Case "Vendor Code"  'Form Change
+'                        rstJob!Vendor_Code = !txtNewDisplay
+'                    Case "Form Type"    'Form Change
+'                        rstJob!Form_Type = !txtNewDisplay
+'                    Case "Medical Device Class" 'Form Change
+'                        rstJob!Medical_Device_Class = !txtNewDisplay
+'                    Case "Language" 'Form Change
+'                        rstJob!Languages = !txtNewDisplay
+                    Case "Job Number"
+                        rstJob!txtJobNumber = !txtNewDisplay
+                    Case "Job Name"
+                        rstJob!txtJobName = !txtNewDisplay
+                    Case "Item"
+                        rstJob!txtMaterialNum = !txtNewDisplay
+                    Case "Division Reviewer"
+                        rstJob!fkDivReviewer = !NewValue
+                        rstJob!txtDivReviewer = !txtNewDisplay
+                    Case "VT Status"
+                        rstJob!fkJobStatus = !NewValue
+                        rstJob!txtJobStatus = !txtNewDisplay
+                    Case "Art Reviewer"
+                        rstJob!fkRaLabeler = !NewValue
+                        rstJob!txtRaLabeler = !txtNewDisplay
+                    Case "Last Updated"
+                        rstJob!dtLastUpdate = !txtNewDisplay
+                    Case "RA Final Approval"
+                        rstJob!dtFinalApproval = !txtNewDisplay
+                    Case "Reopened Date"
+                        rstJob!dtReOpened = !txtNewDisplay
+                    Case "Reopened Reason"
+                        rstJob!fkReOpenedReason = !NewValue
+                    Case "MKT Number"
+                        rstJob!txtMktNum = !txtNewDisplay
+                    Case "Lit Number"
+                        rstJob!txtLitNum = !txtNewDisplay
+                    Case "UDI RA Verified"
+                        rstJob!fkUDI_RA_Verified = !NewValue
+                 End Select
+             End With
+            
+            rstUpdates.MoveNext
+         Loop
+        rstJob.Update
+     End If
+    
+FinishSub:
+    rstUpdates.Close
+    rstJob.Close
+    
+    Set rstUpdates = Nothing
+    Set rstJob = Nothing
+
+End Sub

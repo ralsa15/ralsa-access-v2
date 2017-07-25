@@ -1,0 +1,321 @@
+Option Compare Database
+
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+Function DeleteSubmission(SubmissionID As String)
+    On Error GoTo Err_Handler
+    '// Delete Submission and it's associated activities.  Intended only for an "undo" operation of an initial
+    '   Input, only by a system Administrator
+    
+    'Enter Submission
+    If SubmissionID <> "" Then
+        'Step 1: Remove RA Job Notes
+        Dim sqlJobNotes As String
+        sqlJobNotes = "DELETE * " & _
+                        "FROM Log_RaJobNotes " & _
+                        "WHERE Log_RaJobNotes.fkJobID IN " & _
+                            "(SELECT tblJobLog.anAutonumber " & _
+                            "FROM tblSubmissions INNER JOIN tblJobLog ON tblSubmissions.anSubmissionID = tblJobLog.fkSubmissionID " & _
+                            "WHERE tblSubmissions.stSubmissionEntry = " & Chr(34) & SubmissionID & Chr(34) & ")"
+        
+        'Step 2: Remove Log_JobActivityDetails Entries
+        Dim sqlJobActivity As String
+        sqlJobActivity = "DELETE * " & _
+                            "FROM Log_JobActivityDetails " & _
+                            "WHERE Log_JobActivityDetails.txtJobNumber IN " & _
+                                "(SELECT tblJobLog.txtJobNumber " & _
+                                "FROM tblSubmissions INNER JOIN tblJobLog ON tblSubmissions.anSubmissionID = tblJobLog.fkSubmissionID " & _
+                                "WHERE tblSubmissions.stSubmissionEntry = " & Chr(34) & SubmissionID & Chr(34) & ")"
+        
+        'Step 3: Remove RA Sub Notes
+        Dim sqlSubNotes As String
+        sqlSubNotes = "DELETE * " & _
+                        "FROM Log_RaSubNotes " & _
+                        "WHERE Log_RaSubNotes.fkSubID IN " & _
+                            "(SELECT tblSubmissions.anSubmissionID " & _
+                            "FROM tblSubmissions INNER JOIN tblJobLog ON tblSubmissions.anSubmissionID = tblJobLog.fkSubmissionID " & _
+                                "WHERE tblSubmissions.stSubmissionEntry = " & Chr(34) & SubmissionID & Chr(34) & ")"
+        
+        'Step 4: Remove Log_ActivitySubDetails Entries
+        Dim sqlSubActivity As String
+        sqlSubActivity = "DELETE * " & _
+                            "FROM Log_ActivitySubDetails " & _
+                            "WHERE Log_ActivitySubDetails.txtSubmissionID IN " & _
+                                "(SELECT tblSubmissions.stSubmissionEntry " & _
+                                "FROM tblSubmissions INNER JOIN tblJobLog ON tblSubmissions.anSubmissionID = tblJobLog.fkSubmissionID " & _
+                                "WHERE tblSubmissions.stSubmissionEntry = " & Chr(34) & SubmissionID & Chr(34) & ")"
+        
+        'Step 5a: Delete Log_Changes entries (will replace steps 2 & 3
+        Dim sqlChanges As String
+        sqlChanges = "DELETE * " & _
+                            "FROM Log_Changes " & _
+                            "WHERE Log_Activity.fkJobID IN " & _
+                                "(SELECT tblJobLog.anAutonumber " & _
+                                "FROM tblSubmissions INNER JOIN tblJobLog ON tblSubmissions.anSubmissionID = tblJobLog.fkSubmissionID " & _
+                                "WHERE tblSubmissions.stSubmissionEntry = " & Chr(34) & SubmissionID & Chr(34) & ") "
+        'Step 5b: Delete Log_Activity entries
+        Dim sqlActivity As String
+        sqlActivity = "DELETE * " & _
+                            "FROM Log_Activity " & _
+                            "WHERE Log_Activity.fkJobID IN " & _
+                                "(SELECT tblJobLog.anAutonumber " & _
+                                "FROM tblSubmissions INNER JOIN tblJobLog ON tblSubmissions.anSubmissionID = tblJobLog.fkSubmissionID " & _
+                                "WHERE tblSubmissions.stSubmissionEntry = " & Chr(34) & SubmissionID & Chr(34) & ") " & _
+                            "OR Log_Activity.fkSubID IN " & _
+                                "(SELECT tblSubmissions.anSubmissionID " & _
+                                "FROM tblSubmissions INNER JOIN tblJobLog ON tblSubmissions.anSubmissionID = tblJobLog.fkSubmissionID " & _
+                                "WHERE tblSubmissions.stSubmissionEntry = " & Chr(34) & SubmissionID & Chr(34) & ")"
+        
+        'Step 6: Delete Jobs
+        Dim sqlDeleteJobs As String
+        sqlDeleteJobs = "DELETE * " & _
+                            "FROM tblJobLog " & _
+                            "WHERE tblJobLog.anAutonumber IN " & _
+                                "(SELECT tblJobLog.anAutonumber " & _
+                                "FROM tblSubmissions INNER JOIN tblJobLog ON tblSubmissions.anSubmissionID = tblJobLog.fkSubmissionID " & _
+                                "WHERE tblSubmissions.stSubmissionEntry = " & Chr(34) & SubmissionID & Chr(34) & ")"
+                                
+        'Step 7: Delete Submission
+        Dim sqlDeleteSubmission As String
+        sqlDeleteSubmission = "DELETE * " & _
+                                "FROM tblSubmissions " & _
+                                "WHERE tblSubmissions.stSubmissionEntry = " & Chr(34) & SubmissionID & Chr(34)
+        
+        'Step 8: Delete from DTU if new Submission
+        Dim sqlDailyUpload As String
+        sqlDailyUpload = "DELETE tmp_DailyUpload.* " & _
+                        "FROM tmp_DailyUpload " & _
+                        "WHERE tmp_DailyUpload.SubmissionID = " & Chr(34) & SubmissionID & Chr(34)
+
+        
+        Dim ActiveTransaction: ActiveTransaction = True
+        DBEngine(0).BeginTrans
+        With CurrentDb
+            .Execute sqlJobNotes
+            .Execute sqlJobActivity
+            .Execute sqlSubNotes
+            .Execute sqlSubActivity
+            .Execute sqlDeleteJobs
+            .Execute sqlDeleteSubmission
+            .Execute sqlDailyUpload
+         End With
+        DBEngine(0).CommitTrans
+        ActiveTransaction = False
+    End If
+Exit Function
+Err_Handler:
+    If ActiveTransaction Then DBEngine(0).Rollback
+    MsgBox "Transaction to delete submission Failed"
+    
+End Function
+
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+Function UndoActivity(ActivityID As String)
+    On Error GoTo Err_Handler
+    '//Undo Activity in Log
+    '//Should only be used on last activity - consider writing to test if current value matches "new value" from log
+    
+    Dim cltChanges As Collection
+    Set cltChanges = New Collection
+    'Enter Activity
+    If ActivityID <> "" Then
+        'Step 0: Get Activity Data
+        Dim sqlActivityData As String, rstActivityData As DAO.Recordset
+        sqlActivityData = "SELECT * FROM Log_Activity WHERE Log_Activity.ID = " & ActivityID
+        Set rstActivityData = CurrentDb.OpenRecordset(sqlActivityData)
+        
+        Dim ObjectType As Long, ObjectID As Long, ActivityType As String
+        If rstActivityData!fkJobID > 0 And IsNull(rstActivityData!fkSubID) Then
+            ObjectType = 2  'Job
+            ObjectID = rstActivityData!fkJobID
+         ElseIf rstActivityData!fkSubID <> Null And IsNull(rstActivityData!fkJobID) Then
+            ObjectType = 1  'Submission
+            ObjectID = rstActivityData!fkSubID
+         ElseIf Not IsNull(rstActivityData!fkSubID) And Not IsNull(rstActivityData!fkJobID) Then
+            MsgBox "Error: Activity Identifies both a Job and Submission"
+            Exit Function
+         ElseIf IsNull(rstActivityData!fkSubID) And IsNull(rstActivityData!fkJobID) Then
+            MsgBox "Error: No Job or Submission Identified in Activity"
+            Exit Function
+         End If
+        
+        ActivityType = rstActivityData!txtActivity
+        
+        Set rstActivityData = Nothing
+        
+        'Step 1: Remove RA Job Notes
+        Dim sqlJobNotes As String
+        sqlJobNotes = "DELETE * " & _
+                        "FROM Log_RaJobNotes " & _
+                        "WHERE Log_RaJobNotes.fkActivityID = " & ActivityID
+        cltChanges.Add sqlJobNotes
+       
+        'Step 2: Remove RA Sub Notes
+        Dim sqlSubNotes As String
+        sqlSubNotes = "DELETE * " & _
+                        "FROM Log_RaSubNotes " & _
+                        "WHERE Log_RaSubNotes.fkActivityID = " & ActivityID
+        cltChanges.Add sqlSubNotes
+      
+        'Step 3: Undo Changes to tblJobLog and tblSubmissions
+        Dim sqlUndoChanges As String, rstUndoChanges As DAO.Recordset
+        sqlUndoChanges = "SELECT * " & _
+                            "FROM Log_Changes " & _
+                            "WHERE Log_Changes.fkActivityID = " & ActivityID
+        
+        Set rstUndoChanges = CurrentDb.OpenRecordset(sqlUndoChanges)
+        
+        Dim sqlUndo As String
+        With rstUndoChanges
+        If Not (.BOF And .EOF) Then
+            Do While Not .EOF
+                Select Case !fkObjectType
+                    Case 1 'Submission
+                        Select Case !txtFieldName
+                            Case "Divisional Reviewer"
+                                sqlUndo = "UPDATE tblSubmissions SET fkDivReviewer = " & !OldValue & ", txtDivReviewer = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "Initiator"
+                                sqlUndo = "UPDATE tblSubmissions SET fkInitiator = " & !OldValue & ", txtInitiator = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "Languages"
+                                sqlUndo = "UPDATE tblSubmissions SET fkLanguages = " & !OldValue & ", txtLanguages = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "Medical Device Class"
+                                sqlUndo = "UPDATE tblSubmissions SET fkMedDeviceClass = " & !OldValue & ", txtMedDeviceClass = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "QA Approval"
+                                sqlUndo = "UPDATE tblSubmissions SET fkApproverQA = " & !OldValue & ", txtApproverQA = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "RA Labeler"
+                                sqlUndo = "UPDATE tblSubmissions SET fkRaLabeler = " & !OldValue & ", txtRaLabeler = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "Status"
+                                sqlUndo = "UPDATE tblSubmissions SET fkFormStatus = " & !OldValue & ", txtFormStatus = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "UDI Relevant"
+                                sqlUndo = "UPDATE tblSubmissions SET fkUDI = " & !OldValue
+                            Case "Vendor Code"
+                                sqlUndo = "UPDATE tblSubmissions SET txtVendor = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case Else
+                        End Select
+                        If sqlUndo <> "" Then
+                            sqlUndo = sqlUndo & " WHERE tblSubmissions.anSubmissionID = " & !fkObjectID
+                         End If
+                        
+                    Case 2 'Job
+                        Select Case !txtFieldName
+                            Case "Div Reviewer"
+                                sqlUndo = "UPDATE tblJobLog SET fkDivReviewer = " & !OldValue & ", txtDivReviewer = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "Item Number"
+                                sqlUndo = "UPDATE tblJobLog SET txtMaterialNumber = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "Job Name"
+                                sqlUndo = "UPDATE tblJobLog SET txtJobName = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "Job Number"
+                                sqlUndo = "UPDATE tblJobLog SET txtJobNumber = " & Chr(34) & !txtOldDisplay & Chr(34)
+                            Case "RA Final Approval"
+                                If !txtOldDisplay = vbNullString Then
+                                    sqlUndo = "UPDATE tblJobLog SET dtFinalApproval = Null"
+                                 Else
+                                    sqlUndo = "UPDATE tblJobLog SET dtFinalApproval = " & Chr(34) & !txtOldDisplay & Chr(34)
+                                 End If
+                            Case "ReOpen Date", "Date Job Reopened"
+                                If !txtOldDisplay = vbNullString Then
+                                    sqlUndo = "UPDATE tblJobLog SET dtReOpened = Null"
+                                 Else
+                                    sqlUndo = "UPDATE tblJobLog SET dtReOpened = " & Chr(34) & !txtOldDisplay & Chr(34)
+                                 End If
+                            Case "Reason for Repening"
+                                sqlUndo = "UPDATE tblJobLog SET fkReOpenedReason = " & !OldValue
+                            Case "UDI Compliant"
+                                If IsNull(!OldValue) Then
+                                    sqlUndo = "UPDATE tblJobLog SET fkUDI_RA_Verified = Null"
+                                 Else
+                                    sqlUndo = "UPDATE tblJobLog SET fkUDI_RA_Verified = " & !OldValue
+                                 End If
+                            Case "VT Status"
+                                sqlUndo = "UPDATE tblJobLog SET fkJobStatus = " & !OldValue & ", txtJobStatus = " & Chr(34) & !txtOldDisplay & Chr(34) & ", fkStatusRA = 7"
+                                If IsNull(!txtObjectID) Then
+                                    CurrentDb.Execute "UPDATE tmp_DailyUpload SET Status = " & Chr(34) & !txtOldDisplay & Chr(34) & " WHERE tmp_DailyUpload.anAutonumberJob = " & !fkObjectID, dbFailOnError
+                                 Else
+                                    CurrentDb.Execute "UPDATE tmp_DailyUpload SET Status = " & Chr(34) & !txtOldDisplay & Chr(34) & " WHERE tmp_DailyUpload.[Job Number] = " & !txtObjectID, dbFailOnError
+                                 End If
+                            Case Else
+                        End Select
+                        If sqlUndo <> "" Then
+                            sqlUndo = sqlUndo & " WHERE tblJobLog.anAutoNumber = " & !fkObjectID
+                         End If
+                End Select
+                If sqlUndo <> "" Then
+                    cltChanges.Add sqlUndo  'CurrentDb.Execute sqlUndo, dbFailOnError
+                    sqlUndo = ""
+                 End If
+             .MoveNext
+             Loop
+         End If
+         End With
+         
+         Set rstUndoChanges = Nothing
+        
+        'Step 3b: Delete Label or Ad/Prom Data
+        Select Case ObjectType
+            Case 2
+                If ActivityType = "Approve" Then
+                    cltChanges.Add "DELETE * FROM tblLabelData WHERE fkJobID = " & ObjectID
+                    cltChanges.Add "DELETE * FROM tblAdPromData WHERE fkJobID = " & ObjectID
+                 End If
+            Case Else 'Including 1:Submission
+         End Select
+        
+        'Step 4: Delete Log_Changes entries
+        Dim sqlChanges As String
+        sqlChanges = "DELETE * " & _
+                            "FROM Log_Changes " & _
+                            "WHERE Log_Changes.fkActivityID = " & ActivityID
+        cltChanges.Add sqlChanges
+        'Step 5: Delete Log_Activity entries
+        Dim sqlActivity As String
+        sqlActivity = "DELETE * " & _
+                            "FROM Log_Activity " & _
+                            "WHERE Log_Activity.ID = " & ActivityID
+        cltChanges.Add sqlActivity
+        
+        'Step 6: Determine number of queries for changes, and execute
+        Dim cntChanges As Long
+        cntChanges = cltChanges.Count
+        
+        Dim ActiveTransaction: ActiveTransaction = True
+        DBEngine(0).BeginTrans
+        With CurrentDb
+            For i = 1 To cntChanges
+                Debug.Print cltChanges(i)
+                .Execute cltChanges(i), dbFailOnError
+             Next i
+         End With
+        DBEngine(0).CommitTrans
+        ActiveTransaction = False
+    End If
+Exit Function
+Err_Handler:
+    If ActiveTransaction Then DBEngine(0).Rollback
+    MsgBox "Transaction to undo activity Failed" & vbNewLine & "Err: " & Err.Number & "|" & Err.Description
+    
+End Function

@@ -1,0 +1,74 @@
+Option Compare Database
+Option Explicit
+
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+Public Function StartUp()
+
+    Application.SetOption "Error Trapping", 1
+    DoCmd.OpenForm "DetectIdleTime", , , , , acHidden
+    
+End Function
+
+'|*************************************************************************|
+'| UpdateLink
+'|      Changes the backend data to a different source: Production,
+'|      Network Test, or local Test
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      NewEnvir = (as String) Code to identify new backend data ('PRD','TST','Offline')
+'|
+'|---------------------------------------------------------------
+Sub UpdateLink(NewEnvir As String)
+    
+    Dim Backend As String
+    Dim MyDb As DAO.Database
+    Dim MyTable As DAO.TableDef
+    
+    Set MyDb = CurrentDb()
+    
+    Select Case NewEnvir
+        Case "PRD" 'For Production Backend
+            Backend = "MS Access;;DATABASE=\\pdc\Quality\AAA-Common\Regulatory Affairs\Regulatory Labeling\RALSA_be.accdb"
+        Case "TST" 'For Test Backend
+            Backend = "MS Access;;DATABASE=\\pdc\Quality\AAA-Common\Regulatory Affairs\Regulatory Labeling\RALSA\TEST_RALSA_be.accdb"
+        Case "Offline"
+            Backend = "MS Access;;DATABASE=C:\Users\tdweber\Documents\My Temp Files\TEST_RALSA_be.accdb"
+        Case Else
+            MsgBox "No Environment provided."
+            GoTo Sub_Exit
+     End Select
+    
+    For Each MyTable In MyDb.TableDefs
+        If Len(MyTable.Connect) > 1 Then 'Only update a Linked Table
+            'Debug.Print MyTable.Name
+            If Left(MyTable.Connect, 4) <> "ODBC" Then 'Only update a linked MS Access Table (Not ODBC Connections)
+                MyTable.Connect = Backend
+                MyTable.RefreshLink
+             End If
+         End If
+     Next MyTable
+    
+Sub_Exit:
+    Set MyTable = Nothing
+    Set MyDb = Nothing
+    
+End Sub

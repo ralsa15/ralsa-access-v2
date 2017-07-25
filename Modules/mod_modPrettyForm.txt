@@ -1,0 +1,222 @@
+Option Compare Database
+Option Explicit
+
+Public Function LabelNormal()
+    ' I believe this is the original version, intended to be written as a more generic Function if this Module
+    ' became a more public function
+    '   I could declare constants on the Form Modules to pass to "Global" Function
+    
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    On Error GoTo Error_Handler
+    Dim ctl As Control
+    
+    For Each ctl In Screen.ActiveForm.Controls
+        If TypeOf ctl Is Label Then
+            With ctl
+                If InStr(ctl.Tag, "Button") Then
+                    .SpecialEffect = 1 'Raised
+                    .BackColor = 10789023 'As Defined ~ Theme Color
+                    .ForeColor = 2370610
+                    .FontWeight = 400 'Normal
+                 End If
+                 
+                If InStr(ctl.Tag, "Exit") Then
+                    .SpecialEffect = 0 'None
+                    .BackStyle = 0
+                    .ForeColor = 16777215
+                    .FontWeight = 600 'Normal
+                 End If
+                
+             End With
+         End If
+     Next
+
+Exit_Here:
+    Exit Function
+
+Error_Handler:
+    MsgBox "Error: " & Err.Number & vbNewLine & "Description: " & Err.Description
+    Resume Exit_Here
+End Function
+
+Public Function fLabelMouseDown(strLabelName As String)
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    'Changes a control to appear as "Sunken" upon click.  Requires "Highlight" or "LabelNormal"
+    ' to return to default design
+    
+    On Error Resume Next
+    
+    With Screen.ActiveForm.Controls(strLabelName)
+        .SpecialEffect = 2 'Sunken
+     End With
+
+End Function
+
+
+'Alternative to avoid Flashing Buttons:
+'http://www.experts-exchange.com/Database/MS_Access/Q_27969507.html
+
+Function Highlight(strLabel As String, frmMe As Form, Optional TextColor As Long) As Boolean
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    With frmMe
+        Select Case strLabel
+            Case "hlk_Exit"
+                .Controls(strLabel).ForeColor = TextColor
+                .Controls(strLabel).BackStyle = 1
+                .Controls(strLabel).SpecialEffect = 1
+            Case "hlk_RecordActivity", "Label_ItemLink"
+                .Controls(strLabel).ForeColor = TextColor
+                .Controls(strLabel).BackColor = .Detail.BackColor '33005
+                .Controls(strLabel).SpecialEffect = 1
+            Case "Label_CreateUser", "Label_MyCancel"
+                .Controls(strLabel).ForeColor = TextColor
+                .Controls(strLabel).BackColor = 16777215
+                .Controls(strLabel).SpecialEffect = 1
+            Case "hlk_Approve"
+                .Controls(strLabel).ForeColor = TextColor
+                .Controls(strLabel).BackColor = .Detail.BackColor
+                .Controls(strLabel).SpecialEffect = 1
+            Case "hlk_Reject"
+                .Controls(strLabel).ForeColor = TextColor
+                .Controls(strLabel).BackColor = .Detail.BackColor
+                .Controls(strLabel).SpecialEffect = 1
+            Case Else
+                If InStr(.Controls(strLabel).Tag, "Button") Then
+                    .Controls(strLabel).ForeColor = TextColor
+                    .Controls(strLabel).BackColor = 9664856
+                    .Controls(strLabel).SpecialEffect = 3
+                    ClearAll True, frmMe, strLabel
+                 End If
+         End Select
+     End With
+End Function
+
+Sub ClearAll(hasHighlight As Boolean, frmMe As Form, Optional strLabel As String)
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim arrLabels, arrLabels2, arrLabels3, arrLabelsAppRej
+    Dim lbl As Variant
+    
+    arrLabels = Array("")
+    arrLabels2 = Array("")
+    arrLabels3 = Array("")
+    arrLabelsAppRej = Array("")
+            
+    With frmMe
+        Select Case .Name
+            Case "frmFormsMenu"
+                arrLabels = Array("hlkNewSubmission", "hlkReviewEditSub", "hlkJobLog", "hlkContactLists")
+                arrLabels2 = Array("hlk_Exit")
+            Case "frmJobDetails", "frmSubmissionDetails"
+                arrLabels3 = Array("hlk_RecordActivity")
+                arrLabelsAppRej = Array("hlk_Approve", "hlk_Reject")
+            Case "frmNewSubmission"
+                arrLabels3 = Array("Label_ItemLink")
+            Case "sfrm_User"
+                arrLabels3 = Array("Label_CreateUser", "Label_MyCancel")
+         End Select
+    
+            If hasHighlight Then
+                If Len(Join(arrLabels, "")) > 0 Then
+                    For Each lbl In arrLabels
+                        If strLabel <> lbl And .Controls(lbl).ForeColor <> 2370610 Then
+                            .Controls(lbl).ForeColor = 2370610
+                            .Controls(lbl).BackColor = 10789023
+                            .Controls(lbl).SpecialEffect = 1
+                         End If
+                     Next
+                 End If
+                
+                If Len(Join(arrLabels2, "")) > 0 Then
+                    For Each lbl In arrLabels2
+                        If strLabel <> lbl And .Controls(lbl).ForeColor <> 16777215 Then
+                            .Controls(lbl).ForeColor = 16777215
+                            .Controls(lbl).BackStyle = 0
+                            .Controls(lbl).SpecialEffect = 0
+                         End If
+                     Next
+                 End If
+                
+                If Len(Join(arrLabels3, "")) > 0 Then
+                    For Each lbl In arrLabels3
+                        If strLabel <> lbl And .Controls(lbl).ForeColor <> 16777215 Then
+                            .Controls(lbl).ForeColor = 16777215
+                            .Controls(lbl).BackColor = .Controls("Box_Headers").BackColor '13678199 '9664856 NewSubmission/Accent 2
+                            .Controls(lbl).SpecialEffect = 3
+                         End If
+                     Next
+                 End If
+                
+                If Len(Join(arrLabelsAppRej, "")) > 0 Then
+                    For Each lbl In arrLabelsAppRej
+                        If strLabel <> lbl Then
+                            Select Case lbl
+                                Case "hlk_Approve"
+                                    .Controls(lbl).ForeColor = 16777215
+                                    .Controls(lbl).BackColor = 47478
+                                    .Controls(lbl).SpecialEffect = 3
+                                Case "hlk_Reject"
+                                    .Controls(lbl).ForeColor = 16777215
+                                    .Controls(lbl).BackColor = 5722315
+                                    .Controls(lbl).SpecialEffect = 3
+                             End Select
+                         End If
+                     Next
+                 End If
+                
+                hasHighlight = False
+            End If
+    End With
+        
+End Sub

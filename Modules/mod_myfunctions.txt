@@ -1,0 +1,378 @@
+Option Compare Database
+Option Explicit
+
+Public strUpdatedThrough As String, strAction As String, strPrevFolder As String
+Public strPrevForm As String, strPrevRecord As String
+Public strUserID As String, iUserAuth As Integer
+Public pvDBVersion As String, pvMachine As String, pvMe As String, pvPrevForm As String, pvPrevRecord As String, pvUpdatedThrough As String, pvPrevFolder As String
+Public blUnloading As Boolean 'For frm_Messages
+
+
+'|*************************************************************************|
+'| UserInfo
+'|      Simple function to pull User Info during client logon
+'|
+'|  Returns:
+'|      A collection with the ID and Authorization of the user
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      UserName = (as String)
+'|
+'|---------------------------------------------------------------
+Public Function UserInfo(UserName As String) As Collection
+
+    Dim strSQL As String
+    Dim rstUsers As Object
+    
+    Dim colInfo As Collection
+    Set colInfo = New Collection
+
+    strSQL = "SELECT * FROM tblUsers WHERE txtUserID = '" & UserName & "';"
+    
+    Set rstUsers = CurrentDb.OpenRecordset(strSQL)
+
+    With rstUsers
+        If Not .EOF And Not .BOF Then
+            .MoveFirst
+            colInfo.Add .Fields("iContactID").Value, "ID"
+            colInfo.Add .Fields("iUserAuthLvl").Value, "Authorization"
+         End If
+     End With
+    
+    Set UserInfo = colInfo
+    
+    rstUsers.Close
+
+End Function
+
+
+'|*************************************************************************|
+'| ContactInfo
+'|      Simple function to pull contact info
+'|
+'|  Returns:
+'|      A collection, currently only containing the contact name (combined first & last name)
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      ContactID = (as Long)
+'|
+'|---------------------------------------------------------------
+Public Function ContactInfo(ContactID As Long) As Collection
+
+    Dim strSQL As String
+    Dim rstContacts As Object
+
+    Dim strFirst As String, strLast As String
+
+    Dim colInfo As Collection
+    Set colInfo = New Collection
+
+    strSQL = "SELECT * FROM tblContacts WHERE [ID] = " & ContactID & ";"
+    
+    Set rstContacts = CurrentDb.OpenRecordset(strSQL)
+
+    With rstContacts
+        If Not .EOF And Not .BOF Then
+            If .Fields("VT_FirstName") = "" Or IsNull(.Fields("VT_FirstName")) Then
+                strFirst = .Fields("txtFirstName").Value
+             Else
+                strFirst = .Fields("VT_FirstName")
+             End If
+            If .Fields("VT_LastName") = "" Or IsNull(.Fields("VT_LastName")) Then
+                strLast = .Fields("txtLastName").Value
+             Else
+                strLast = .Fields("VT_LastName")
+             End If
+            
+            colInfo.Add strFirst & " " & strLast, "FullName"
+         End If
+     End With
+    
+    Set ContactInfo = colInfo
+
+    rstContacts.Close
+
+End Function
+
+
+'|*************************************************************************|
+'| NumericStringTest
+'|      Tests a string to determine if it could be numeric
+'|
+'|  Returns:
+'|      A boolean value as to whether the string is numeric (true) or contains other characters (false)
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      str4Test = (as String) The string to test if it is a number
+'|
+'|---------------------------------------------------------------
+Function NumericStringTest(str4Test As String) As Boolean
+
+    Dim i As Long
+    
+    For i = 1 To Len(str4Test)
+        If IsNumeric(Mid(str4Test, i, 1)) = False Then
+            NumericStringTest = False
+            Exit Function
+         End If
+     Next i
+
+    NumericStringTest = True
+
+End Function
+
+
+'|*************************************************************************|
+'| RemoveInternalSpace
+'|      Removes all spaces from a string, including the middle
+'|
+'|  Returns:
+'|      The new string after removing spaces
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      str4process = (as String) The string from which to remove spaces
+'|
+'|---------------------------------------------------------------
+Function RemoveInternalSpace(str4process As String) As String
+
+    Dim strChar As String
+
+    str4process = Trim(str4process)
+    
+    Dim i As Long
+    For i = 1 To Len(str4process)
+        strChar = Mid(str4process, i, 1)
+        If strChar = " " Or strChar = Chr(160) Then
+         Else
+             RemoveInternalSpace = RemoveInternalSpace + strChar
+         End If
+     Next i
+
+End Function
+
+
+'|*************************************************************************|
+'| storLocalVars
+'|      Captures information to be stored in the lt_SysVar table for the client to reference
+'|      when necessary
+'|
+'|  Functions Called:
+'|      UserInfo (myfunctions)
+'|      ContactInfo (myfunctions)
+'|      LocalVarTbl (myfunctions)
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      Mode = (as String) Variable to determine which data to record
+'|
+'|  Notes:
+'|      Used in:  DetectIdleTime, Form_Load()
+'|
+'|---------------------------------------------------------------
+Sub storLocalVars(Mode As String)
+
+    Dim strSQL As String
+    Dim rstSysVar As Object
+    
+    strSQL = "SELECT * FROM lt_SysVar"
+    
+    Set rstSysVar = CurrentDb.OpenRecordset(strSQL)
+
+    Select Case Mode
+        Case "Login"
+            Dim UserContactID As Long, UserID As String
+            Dim colContact As Variant, colUser As Collection
+            
+            UserID = Environ("Username")
+            Set colUser = UserInfo(UserID)
+            UserContactID = colUser(1)
+            Set colContact = ContactInfo(UserContactID)
+
+            LocalVarTbl rstSysVar, "lv_sDBVersion", CurrentProject.Name
+            LocalVarTbl rstSysVar, "lv_sMachine", Environ("ComputerName")
+            LocalVarTbl rstSysVar, "lv_sUser", UserID
+            LocalVarTbl rstSysVar, "lv_sUserName", colContact.Item("FullName")
+            LocalVarTbl rstSysVar, "lv_iContactID", colUser.Item("ID")
+            LocalVarTbl rstSysVar, "lv_iUserAuthLvl", colUser.Item("Authorization")
+        Case "Upload"
+            rstSysVar.FindFirst "[lv_tVariable] = 'lv_sPrevFolder'"
+            If rstSysVar.Fields("lv_tValue") = "" Then
+                LocalVarTbl rstSysVar, "lv_sPrevFolder", "\\sequoia\centdata\system\docs\gtin\"
+             End If
+     End Select
+
+    rstSysVar.Close
+    Set rstSysVar = Nothing
+
+End Sub
+
+
+'|*************************************************************************|
+'| LocalVarTbl
+'|      Edits the recordset (rstSysVar) passed with new data
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      rstSysVar = (as Object) The recordset to be modified
+'|      vVariable = (as String) A string variable to identify which 'system variable' to update
+'|      vValue = (as String) The new value to record for the 'system variable'
+'|
+'|---------------------------------------------------------------
+Function LocalVarTbl(rstSysVar As Object, vVariable As String, vValue As String)
+
+    With rstSysVar
+        .FindFirst "[lv_tVariable] = '" & vVariable & "'"
+        .Edit
+        .Fields("lv_tValue") = vValue
+        .Update
+     End With
+    
+End Function
+
+
+'|*************************************************************************|
+'| useLocalVar
+'|      Function to retrieve local 'system variable' data
+'|
+'|  Returns:
+'|      String representing the local 'system variable'
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      vVariable = (as String) A string representing the local 'system variable' to return
+'|
+'|---------------------------------------------------------------
+Public Function useLocalVar(vVariable As String) As String
+    
+    Dim strSQL As String
+    Dim rstSysVar As Object
+    
+    strSQL = "SELECT * FROM lt_SysVar"
+    Set rstSysVar = CurrentDb.OpenRecordset(strSQL)
+    
+    With rstSysVar
+        .FindFirst "[lv_tVariable] = '" & vVariable & "'"
+        useLocalVar = .lv_tValue
+     End With
+    
+End Function
+
+
+'|*************************************************************************|
+'| ShutDown
+'|      Closes open forms and shuts down the application
+'|
+'|  Functions Called:
+'|      UserStatus (DetectStatus)
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+Sub ShutDown()
+
+    On Error Resume Next
+    Dim lngfrmCount As Long, lngrptCount As Long, lngCount As Long
+    
+    UserStatus "", "", 0, "Logout"
+    
+    lngfrmCount = Forms.Count
+    lngrptCount = Reports.Count
+    ' close all forms
+    For lngCount = 0 To lngfrmCount - 1
+        DoCmd.SelectObject acForm, Forms(lngCount).Name
+        DoCmd.Close
+     Next
+    ' close all reports
+    For lngCount = 0 To lngrptCount - 1
+        DoCmd.SelectObject acReport, Reports(lngCount).Name
+        DoCmd.Close
+     Next
+    blUnloading = True
+    DoCmd.Quit
+End Sub
+
+
+'|*************************************************************************|
+'| RoundFromZero
+'|      Primarily used to round dates/times to increments (such as 15 minutes)
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      dblVal = (as Double) Value to be rounded
+'|      dblTo = (as Double) Setting to determine rounded increment
+'|
+'|  Notes:
+'|      Borrowed from Ken Sheridan, who posted on
+'|          http://answers.microsoft.com/en-us/office/forum/office_2007-access/round-date-time-field-to-fifteen-minutes/17e2bfc0-6f78-4651-b451-005ebe560cad
+'|      Returns a Double value, which if converted using CDate() allows for rounding of time to a specific interval
+'|      dblVal= Now; dblTo = #0:15:00#  Rounds to the NEXT 15 minute mark, -#0:15:00# to the previous
+'|      Including DateAdd("ww",1,Now()) for dblVal allows for add weeks, months ("m"), years ("yyyy") etc.
+'|
+'|      1/17/2017 - Not Currently Used - Reviewing for Need before removal (including move to scheduler)
+'|
+'|---------------------------------------------------------------
+Public Function RoundFromZero(dblVal As Double, dblTo As Double) As Double
+    
+
+    Dim intUpDown As Integer
+    Dim lngTestValue As Long
+    Dim dblTestValue As Double
+    Dim dblDenominator As Double
+   
+    If dblVal < 0 Then
+        intUpDown = 1
+    Else
+        intUpDown = -1
+    End If
+  
+    dblDenominator = intUpDown * dblTo
+    dblTestValue = dblVal / dblDenominator
+    lngTestValue = Int(dblTestValue)
+    RoundFromZero = intUpDown * lngTestValue * dblTo
+ 
+End Function

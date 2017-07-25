@@ -1,0 +1,479 @@
+Option Compare Database
+Option Explicit
+Public ActiveTransaction As Boolean
+
+Sub JobActivity(ByRef JobForm As Form, SendToVT As Boolean)
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim strNoteBy As String, strSummary As String, lngUserID As Long
+    Dim strActivityID As String, dtTimeStamp As Date, dtActivity As Date, ctrl As Control
+    
+    On Error GoTo MyError
+    
+    Dim wrkSpace As DAO.Workspace
+    Set wrkSpace = DBEngine(0)
+
+    Dim strValidity As String
+    strValidity = JobActivityValidation(JobForm)
+    
+    If strValidity = "" Then
+        
+        strNoteBy = useLocalVar("lv_sUserName")
+        lngUserID = useLocalVar("lv_iContactID")
+        dtTimeStamp = Now
+        dtActivity = JobForm.tbActivityDate
+        strActivityID = Format(lngUserID, "000") & "." & Format(dtTimeStamp, "YYYYMMDDhhmmss")
+
+        If JobForm.tbNotesVT = "" Or IsNull(JobForm.tbNotesVT) Then
+            strSummary = JobSummaryTest(JobForm)
+         Else
+            strSummary = JobForm.tbNotesVT
+         End If
+        Debug.Print strSummary
+        
+        ActiveTransaction = True
+        wrkSpace.BeginTrans
+        
+        If strSummary <> "" Then
+            Dim sqlLogAdd As String
+            sqlLogAdd = "INSERT INTO Log_Activity ( fkJobID, txtActivity, txtActivityID, txtReason," & _
+                        "txtNewStatus, dtActivityStamp, fkUserID, UserName, txtSummary, TransferVT, dtRecorded) " & _
+                        " SELECT '" & JobForm.anAutoNumber & "', '" & JobForm.cbAction.Column(1) & "', '" & strActivityID & _
+                        "', '" & JobForm.cbActReason.Column(1) & "', " & Chr(34) & JobForm.cbStatus.Column(1) & Chr(34) & ", '" & dtActivity & "', '" & lngUserID & "', '" & strNoteBy & "', " & Chr(34) & _
+                        strSummary & Chr(34) & ", " & SendToVT & ", '" & dtTimeStamp & "' ;"
+            
+            Debug.Print sqlLogAdd
+            
+            CurrentDb.Execute sqlLogAdd, dbFailOnError
+         End If
+        
+        For Each ctrl In JobForm!Jobs_Page.Controls
+            If Not (ctrl.ControlType = 100 Or ctrl.ControlType = 101) And Not ctrl.Name = "tbNotesVt" And Not ctrl.Name = "tbNotesRA" Then
+                Dim strFieldName As String, strNewVal As String, strOldVal As String
+                
+                Debug.Print ctrl.Name
+                
+                strFieldName = ctrl.Properties("DataSheetCaption")
+                If strFieldName <> "" Then Debug.Print strFieldName
+                If strFieldName <> "" And ctrl.Value <> ctrl.OldValue Then
+                    strNewVal = ctrl.Value
+                    strOldVal = ctrl.OldValue
+                    Debug.Print strNewVal
+                    
+                    sqlLogAdd = "INSERT INTO Log_JobActivityDetails ( fkActivityID, txtFieldName, txtNewValue, txtOldValue ) " & _
+                    "SELECT '" & strActivityID & "', '" & strFieldName & "', '" & strNewVal & "', '" & strOldVal & "' ; "
+                 CurrentDb.Execute sqlLogAdd, dbFailOnError
+                 End If
+             End If
+         Next
+
+        'If Notes are populated, records them in Log_RaJobNotes
+        If Not IsNull(JobForm.tbNotesRA) Then
+
+            Dim sqlNotes As String
+            sqlNotes = "INSERT INTO [Log_RaJobNotes] ( fkJobID, dtJobNote, txtNote, txtNoteBy, dtRecorded) " & _
+                            "SELECT '" & JobForm.anAutoNumber & "', '" & dtActivity & "', " & Chr(34) & _
+                            JobForm.tbNotesRA & Chr(34) & ", '" & strNoteBy & "', '" & dtTimeStamp & "' ; "
+            
+            CurrentDb.Execute sqlNotes, dbFailOnError
+         End If
+        
+        JobForm.dtLastUpdate = dtTimeStamp
+        Select Case JobForm.cbAction
+            Case 4 'Approve
+                JobForm!fkStatusRA = 4
+         End Select
+        wrkSpace.CommitTrans
+        ActiveTransaction = False
+        DTU_NotesUpdate (JobForm.anAutoNumber)
+     End If
+
+ImFinished:
+    wrkSpace.Close
+    Set wrkSpace = Nothing
+    Exit Sub
+MyError:
+    MsgBox "Failed to record Job Activity." & vbNewLine & _
+        "Error: " & Err.Number & vbNewLine & "Descrp: " & Err.Description & vbNewLine & _
+        strValidity, vbCritical, "ERROR"
+    
+    If ActiveTransaction Then
+        wrkSpace.Rollback
+     End If
+    
+    Resume ImFinished
+End Sub
+
+Function JobActivityValidation(ByRef JobForm As Form) As String
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim cltValidations As Collection, vError As Variant
+    Set cltValidations = New Collection
+    
+    With JobForm
+    Dim bReason As Boolean
+        bReason = IsNull(.cbActReason) Or .cbActReason = ""
+        
+    Select Case .cbAction
+        Case 6 'Reassign
+            Dim bRaReviewer As Boolean
+            bRaReviewer = .cbAssignedTo.Value <> .cbAssignedTo.OldValue
+
+            If bRaReviewer = False Then
+                cltValidations.Add "No Reassignment present."
+             End If
+
+        Case 4 'Returned To
+            If IsNull(.cbSentTo) Or .cbSentTo = "" Then cltValidations.Add "Indicate to whom correspondence was sent/returned."
+            
+        Case 3 'Approve
+            If .cbUDIComplete.Visible = True And (IsNull(.cbUDIComplete) Or .cbUDIComplete > 2) Then cltValidations.Add "To approve packaging jobs, you must indicate if Labeling is UDI compliant."
+            bReason = False
+        Case 5 'Reject
+        Case 2 'Add Notes
+            bReason = False
+            If IsNull(.tbNotesRA) Then cltValidations.Add "No RA Notes Provided"
+        Case 1 'Received
+        Case 8 'Update Details
+            bReason = False
+            Dim RevChange As Boolean, StatusChange As Boolean, JobNumChange As Boolean, NameChange As Boolean, ItemChange As Boolean
+            If IsNull(.tbJobNumber.OldValue) Then
+                If .tbJobNumber.Value = .tbJobNumber.OldValue Then
+                    JobNumChange = True
+                 Else: JobNumChange = False
+                 End If
+             Else: JobNumChange = True
+             End If
+            If .cbDivReviewer.Value = .cbDivReviewer.OldValue Then RevChange = True
+            If .cbStatus.Value = .cbStatus.OldValue Then StatusChange = True
+            If .tbJobName.Value = .tbJobName.OldValue Then NameChange = True
+            If .tbMaterialNum.Value = .tbMaterialNum.OldValue Then ItemChange = True
+            If RevChange And StatusChange And JobNumChange And NameChange And ItemChange Then cltValidations.Add "No Changes Made"
+        Case 7 'Reopen
+            If IsNull(.tbNotesRA) Then cltValidations.Add "Please provide RA Notes describing why Job is being reopened."
+        Case 9  'Reject
+        Case Else
+            cltValidations.Add "Action Not Recognized."
+     End Select
+
+    If bReason Then cltValidations.Add "'Reason for Action' must be populated."
+    
+    End With
+
+    If cltValidations.Count > 0 Then
+        Dim strErrors As String
+        For Each vError In cltValidations
+            Debug.Print vError
+            strErrors = vError & vbNewLine & strErrors
+         Next
+        
+        MsgBox "Unable to record activity: " & vbNewLine & vbNewLine & strErrors, , "Error"
+        JobActivityValidation = strErrors
+     End If
+
+End Function
+
+Function JobSummaryTest(ByRef JobForm As Form) As String
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    With JobForm
+    Select Case .cbAction
+        Case 6 'Reassign
+            Dim bRaReviewer As Boolean
+            bRaReviewer = .cbAssignedTo.Value <> .cbAssignedTo.OldValue
+            
+            If bRaReviewer Then
+                JobSummaryTest = .cbAction.Column(2) & " " & .cbAssignedTo.Column(1)
+             End If
+        Case 9 'Reject (formerly Returned To)
+            JobSummaryTest = .cbAction.Column(2) & IIf(.cbSentTo = "", "", ": Returned to " & .cbSentTo.Column(1)) & _
+            IIf(.cbActReason = "", "", "; " & .cbActReason.Column(1))
+        Case 3 'Approve
+            JobSummaryTest = .cbAction.Column(2)
+        Case 5 'Cancelled (was 'Reject')
+            JobSummaryTest = .cbAction.Column(2) & ": " & .cbActReason.Column(1)
+        Case 2 'Add Notes
+            JobSummaryTest = .cbAction.Column(2)
+        Case 1 'Received
+            JobSummaryTest = "Received by RA: " & .cbActReason.Column(1)
+        Case 8 'Update Details
+            JobSummaryTest = .cbAction.Column(2) '"Updated Details in RA Log."
+        Case 7 'Reopened
+            JobSummaryTest = .cbAction.Column(2) & IIf(.cbActReason = "", "", ": " & .cbActReason.Column(1))
+        Case 4 'Returned/Sent to (formerly Reject)
+            JobSummaryTest = .cbAction.Column(2) & IIf(.cbActReason = "", "", ": " & .cbActReason.Column(1))
+        Case Else
+            JobSummaryTest = "Action Not Recognized."
+     End Select
+
+    If .chkIncludeInVT Then
+        Select Case .cbAction
+            Case 1, 2, 8
+                JobSummaryTest = IIf(IsNull(.tbNotesRA), JobSummaryTest, .tbNotesRA)
+            Case 3, 4, 5, 6, 7, 9
+                JobSummaryTest = JobSummaryTest & "; " & .tbNotesRA
+         End Select
+     End If
+
+    If Right(JobSummaryTest, 2) = (": ") Or Right(JobSummaryTest, 2) = ("; ") Then
+        JobSummaryTest = Left(JobSummaryTest, Len(JobSummaryTest) - 2)
+     End If
+    .tbNotesVT = JobSummaryTest
+    
+    End With
+
+End Function
+
+Function ActivityValidate(ByRef MeFrm As Form, Optional TypeErrors As String) As Boolean
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim ctrl As Control
+    'Submission is Invalid until Proven Valid
+    ActivityValidate = False
+    
+    Dim RequiredFields As Collection
+    Set RequiredFields = New Collection
+    With MeFrm
+
+        Dim ReqTag As String, TestMe As Boolean
+        TestMe = False
+        ReqTag = "*Req" & .cbAction & "*"
+                For Each ctrl In .Controls
+                    TestMe = False
+                    If ctrl.ControlType <> 127 Then
+                        If ctrl.Tag Like "SkipTest" Then
+                            TestMe = False
+                        ElseIf ctrl.Tag Like ReqTag And ctrl.Visible Then
+                            TestMe = True
+                        ElseIf ctrl.Tag Like "*Required*" And ctrl.Visible Then
+                            TestMe = True
+                        End If
+                        
+                        Debug.Print ctrl.Name & "|" & TestMe & "|" & ctrl.Tag
+                        
+                        If TestMe Then
+                            Debug.Print ctrl.Name & " | " & ctrl.Tag & " | " & ctrl.StatusBarText
+                            If ctrl.Value = "" Or IsNull(ctrl.Value) Then
+                                RequiredFields.Add "    - " & ctrl.StatusBarText
+                                ctrl.BorderColor = 5722315
+                                ctrl.BackColor = 12368362
+                             Else
+                                ctrl.BorderColor = 0
+                                ctrl.BackColor = 16777215
+                             End If
+                         End If
+                     End If
+                 Next
+
+        
+        Dim MyErrorCount As Long
+        MyErrorCount = RequiredFields.Count
+        Dim MyErrors As String, i As Long
+        
+        If MyErrorCount > 0 And TypeErrors <> "" Then
+            
+            MyErrors = "Cannot Process Activity!" & vbNewLine & "Please provide values for the following required field(s):" & vbNewLine & ""
+            For i = 1 To MyErrorCount
+                MyErrors = MyErrors & vbNewLine & RequiredFields(i)
+             Next
+            MyErrors = MyErrors & vbNewLine & vbNewLine & "Additional Errors:" & vbNewLine & TypeErrors
+            MsgBox MyErrors, vbCritical, "Activity Incomplete"
+         ElseIf MyErrorCount > 0 Then
+
+            MyErrors = "Cannot Process Activity!" & vbNewLine & "Please provide values for the following required field(s):" & vbNewLine & ""
+            For i = 1 To MyErrorCount
+                MyErrors = MyErrors & vbNewLine & RequiredFields(i)
+             Next
+            
+            MsgBox MyErrors, vbCritical, "Activity Incomplete"
+         ElseIf TypeErrors <> "" Then
+            MsgBox TypeErrors, vbCritical, "Please resolve the following error(s):"
+         Else
+            ActivityValidate = True
+         End If
+    End With
+End Function
+
+Sub JobActivity2(ByRef JobForm As Form, SendToVT As Boolean)
+'|*************************************************************************|
+'| StartUp
+'|      Called by the AutoExec procedure at startup
+'|
+'|  Functions Called:
+'|      N/A
+'|
+'|  Subs Called:
+'|      N/A
+'|
+'|  Arguments:
+'|      N/A
+'|
+'|---------------------------------------------------------------
+    Dim strNoteBy As String, strSummary As String, lngUserID As Long
+    Dim strActivityID As String, dtTimeStamp As Date, dtActivity As Date, ctrl As Control
+    Dim StatusChange As String
+    
+    On Error GoTo MyError
+    
+    Dim wrkSpace As DAO.Workspace
+    Set wrkSpace = DBEngine(0)
+
+    Dim strValidity As String
+    strValidity = JobActivityValidation(JobForm)
+    
+    If strValidity = "" Then
+        
+        strNoteBy = useLocalVar("lv_sUserName")
+        lngUserID = useLocalVar("lv_iContactID")
+        dtTimeStamp = Now
+        dtActivity = JobForm.tbActivityDate
+        strActivityID = Format(lngUserID, "000") & "." & Format(dtTimeStamp, "YYYYMMDDhhmmss")
+
+        If Format(dtTimeStamp, "m/d/yyyy") <> Format(dtActivity, "m/d/yyyy") Then
+            dtActivity = Format(dtActivity, "m/d/yyyy")
+         End If
+        If Format(dtTimeStamp, "m/d/yyyy") <> Format(JobForm.tbFinalApproval, "m/d/yyyy") And JobForm.tbFinalApproval.Visible = True Then
+            JobForm.tbFinalApproval = Format(JobForm.tbFinalApproval, "m/d/yyyy")
+            ChangeTrack JobForm.tbFinalApproval
+         End If
+        If JobForm.tbNotesVT = "" Or IsNull(JobForm.tbNotesVT) Then
+            strSummary = JobSummaryTest(JobForm)
+         Else
+            strSummary = JobForm.tbNotesVT
+         End If
+        Debug.Print strSummary
+        
+        Select Case JobForm.cbAction
+            Case 1, 4, 5, 7 'Received, Return/Sent, Cancel, Reopen
+                StatusChange = JobForm.cbStatus.Column(1)
+            Case 2, 3, 6, 8, 9 'Add Notes, Approve, Reassign - RA Labeler, Update Details, Reject
+                StatusChange = ""
+         End Select
+        
+        ActiveTransaction = True
+        wrkSpace.BeginTrans
+        
+        If strSummary <> "" Then
+            Dim sqlLogAdd As String
+            sqlLogAdd = "INSERT INTO Log_Activity ( fkJobID, txtActivity, txtActivityID, txtReason," & _
+                        "txtNewStatus, dtActivityStamp, fkUserID, UserName, txtSummary, TransferVT, " & _
+                        "txtJobNumber, dtRecorded ) " & _
+                        " SELECT '" & JobForm.anAutoNumber & "', '" & JobForm.cbAction.Column(1) & _
+                        "', '" & strActivityID & "', '" & JobForm.cbActReason.Column(1) & _
+                        "', " & Chr(34) & StatusChange & Chr(34) & ", '" & dtActivity & _
+                        "', '" & lngUserID & "', '" & strNoteBy & "', " & Chr(34) & strSummary & Chr(34) & _
+                        ", " & SendToVT & ", '" & JobForm.txtJobNumber & "', '" & dtTimeStamp & "' ;"
+            Debug.Print sqlLogAdd
+            
+            CurrentDb.Execute sqlLogAdd, dbFailOnError
+         End If
+
+'>>>>>>>>>>>>>>>>>>>
+        Dim sqlFindID As String, rstFindID As DAO.Recordset
+        sqlFindID = "SELECT ID FROM Log_Activity WHERE txtActivityID = " & Chr(34) & strActivityID & Chr(34)
+        Set rstFindID = CurrentDb.OpenRecordset(sqlFindID)
+        
+        Dim fkActivityID As Long
+        fkActivityID = rstFindID.Fields("ID")
+        Set rstFindID = Nothing
+
+        sqlLogAdd = "INSERT INTO Log_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                    "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                    "OldValue, txtOldDisplay ) " & _
+                    "SELECT " & fkActivityID & ", " & Chr(34) & strActivityID & Chr(34) & ", fkObjectType, " & _
+                    "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                    "OldValue, txtOldDisplay " & _
+                    "FROM lt_Changes " & _
+                    "WHERE lt_Changes.bRecordChange = True"
+        
+        CurrentDb.Execute sqlLogAdd, dbFailOnError
+
+'<<<<<<<<<<<<<<<<<<
+        'If Notes are populated, records them in Log_RaJobNotes
+        If Not IsNull(JobForm.tbNotesRA) Then
+
+            Dim sqlNotes As String
+            sqlNotes = "INSERT INTO [Log_RaJobNotes] ( fkJobID, dtJobNote, txtNote, txtNoteBy, dtRecorded, fkActivityID) " & _
+                            "SELECT '" & JobForm.anAutoNumber & "', '" & dtActivity & "', " & Chr(34) & _
+                            JobForm.tbNotesRA & Chr(34) & ", '" & strNoteBy & "', '" & dtTimeStamp & "' , " & CStr(fkActivityID) & "; "
+            
+            CurrentDb.Execute sqlNotes, dbFailOnError
+         End If
+        
+        JobForm.dtLastUpdate = dtTimeStamp
+        Select Case JobForm.cbAction
+            Case 4 'Approve
+                JobForm!fkStatusRA = 4
+         End Select
+        wrkSpace.CommitTrans
+        ActiveTransaction = False
+        UpdateJobDU JobForm.anAutoNumber, fkActivityID  'Handles Data Field Changes to send to VT
+        DTU_NotesUpdate (JobForm.anAutoNumber)  'Handles RA Notes for VT
+        'UpdateJobJL JobForm.anAutoNumber, fkActivityID
+        
+     End If
+
+ImFinished:
+    EndChangeTrack
+    wrkSpace.Close
+    Set wrkSpace = Nothing
+    Exit Sub
+MyError:
+    MsgBox "Failed to record Job Activity." & vbNewLine & _
+        "Error: " & Err.Number & vbNewLine & "Descrp: " & Err.Description & vbNewLine & _
+        strValidity, vbCritical, "ERROR"
+    
+    If ActiveTransaction Then
+        wrkSpace.Rollback
+     End If
+    
+    Resume ImFinished
+End Sub
