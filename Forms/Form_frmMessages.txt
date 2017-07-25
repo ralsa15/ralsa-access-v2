@@ -1,0 +1,69 @@
+Option Compare Database
+Option Explicit
+Dim lngCriticalWarnings As Long ' flags critical warnings to a user
+Const lngMaxWarnings = 5
+Const MessageSpace = "  - "
+
+Private Sub cmdDismiss_Click()
+    ' hide the form
+    Me.Visible = False
+    Me.TimerInterval = 300000
+End Sub
+
+Private Sub Form_Load()
+    Dim strTest As String, rstMessages As Recordset, iRecCount As Long, iMessageHeight As Long
+    
+    strTest = "SELECT tblMessages.* FROM tblMessages WHERE bActive = True;"
+    
+    Set rstMessages = CurrentDb.OpenRecordset(strTest)
+    
+    If Not rstMessages.BOF And Not rstMessages.EOF Then
+        rstMessages.MoveLast
+        If rstMessages.RecordCount < 1 Then
+            iRecCount = 1
+         Else: iRecCount = rstMessages.RecordCount
+         End If
+     End If
+    
+    rstMessages.Close
+    
+    iMessageHeight = (2412 + (914.976 * iRecCount)) '1440 TWIPs per inch, 2412 is For Header and Footer, 914.976 is .6347 as height of Detail section
+    
+    DoCmd.MoveSize , , , iMessageHeight
+    lngCriticalWarnings = 0
+    blUnloading = False
+End Sub
+
+Private Sub Form_Timer()
+    Dim db As Database
+    Dim rst As Recordset
+    Dim rstLog As Recordset
+    Set db = CurrentDb
+    Dim strSQL As String
+    ' find any critical shutdown messages that apply
+    strSQL = "SELECT * FROM tblMessages WHERE tblMessages.dtCriticalTime > DateAdd('n',-30,Time()) AND bActive = True"
+    Set rst = db.OpenRecordset(strSQL, dbOpenDynaset)
+    If rst.EOF Then
+        If lngCriticalWarnings > lngMaxWarnings Then
+            ShutDown
+         End If
+     Else
+        rst.Filter = "bForceExit = True"
+            ' warn the user
+            Me.Requery
+            Me.Visible = True
+            ' this stays on the screen until the user clicks dismiss
+
+     End If
+    rst.Close
+
+End Sub
+
+'If bForceExit Then ShutDown
+
+Private Sub Form_Unload(Cancel As Integer)
+    If Not blUnloading Then
+        Me.Visible = False
+        Cancel = True
+    End If
+End Sub

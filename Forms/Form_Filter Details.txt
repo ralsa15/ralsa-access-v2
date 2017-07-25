@@ -1,0 +1,84 @@
+
+Private Sub cmdClose_Click()
+    On Error Resume Next
+    If Me.Dirty Then
+        DoCmd.RunCommand acCmdSaveRecord
+     End If
+    If Err Then
+        DoCmd.Beep
+        MsgBox "Failed to save." & vbNewLine & "Error: " & Err.Number & vbNewLine & "Descr: " & Err.Description
+     End If
+    DoCmd.Close acForm, Me.Name, acSavePrompt
+
+End Sub
+
+Private Sub CmdDelete_Click()
+    On Error GoTo Err_Handler
+    
+    If Not Me.NewRecord Then
+        DoCmd.RunCommand acCmdDeleteRecord
+     End If
+    If Me.NewRecord And Not Me.Dirty Then
+        DoCmd.Beep
+     End If
+    If Me.NewRecord And Me.Dirty Then
+        Me.Undo
+     End If
+
+Err_Handler:
+    If Err Then
+        DoCmd.Beep
+        MsgBox "Failed to save." & vbNewLine & "Error: " & Err.Number & vbNewLine & "Descr: " & Err.Description
+     End If
+
+On Error Resume Next
+    DoCmd.Close acForm, Me.Name, acSavePrompt
+End Sub
+
+Private Sub Combo52_AfterUpdate()
+    filtersearch
+End Sub
+
+Private Sub Form_Load()
+    With Me
+        If .OpenArgs <> vbNullString Then
+            Dim arrOpenArgs() As String
+            arrOpenArgs = Split(.OpenArgs, "|")
+            .cbObjectType = .OpenArgs(0)
+            .cbObjectName = .OpenArgs(1)
+            .tbFilterString = .OpenArgs(2)
+            .tbSortString = .OpenArgs(3)
+         End If
+     End With
+End Sub
+
+Sub filtersearch()
+    'If IsNull(Me.Combo52) Then Exit Sub
+    On Error Resume Next
+    If Me.Dirty Then
+        Dim SaveTest As Long
+        SaveTest = MsgBox("Would you like to save changes?", vbYesNoCancel, "Save changes?")
+        Select Case SaveTest
+            Case vbYes
+                DoCmd.RunCommand acCmdSaveRecord
+            Case vbNo
+                Me.Undo
+            Case vbCancel
+                Exit Sub
+         End Select
+     End If
+    If Err Then
+        DoCmd.Beep
+        MsgBox "Failed to save." & vbNewLine & "Error: " & Err.Number & vbNewLine & "Descr: " & Err.Description
+     End If
+    
+    Dim SearchString As Variant, rstSearch As DAO.Recordset
+    'SearchString = Me.Combo52
+    Set rstSearch = CurrentDb.OpenRecordset(Me.Recordset)
+
+    rstSearch.FindFirst "[ID]=" & SearchString
+    'Me.ID = Me.Combo52
+    Set rstSearch = Nothing
+    rstSearch.Close
+    Screen.ActiveControl = Null
+End Sub

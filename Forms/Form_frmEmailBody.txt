@@ -1,0 +1,9 @@
+Option Compare Database
+
+Private Sub cmdDone_Click()
+    DoCmd.Close acForm, Me.Name
+End Sub
+
+Private Sub Form_Load()
+    Me.tbEmailBody = Forms!frmEmailBody.OpenArgs
+End Sub

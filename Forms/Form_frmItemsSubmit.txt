@@ -1,0 +1,56 @@
+Option Compare Database
+Option Explicit
+Dim IveChanged As Boolean
+
+Private Sub cmdCancel_Click()
+    ClearSubItems
+    DoCmd.Close acForm, Me.Name
+End Sub
+
+Private Sub cmdClear_Click()
+    ClearSubItems
+    Me.AllowAdditions = True
+    Me.Requery
+End Sub
+
+Private Sub cmdExcel_Click()
+    copyExcel
+    IveChanged = True
+    Me.AllowAdditions = False
+    Me.Requery
+End Sub
+
+Private Sub cmdSaveClose_Click()
+    DoCmd.RunCommand acCmdSaveRecord
+    IveChanged = False
+    DoCmd.Close acForm, Me.Name
+End Sub
+
+Private Sub Form_Close()
+    Dim SaveMe As Long
+    If IveChanged Then
+        SaveMe = MsgBox("Do you want to save these Jobs?", vbYesNo, "Entries are not saved!")
+        Select Case SaveMe
+            Case vbYes
+            Case vbNo
+                ClearSubItems
+         End Select
+     End If
+    On Error Resume Next
+    Forms!frmNewSubmission.Controls("lbxMaterials").Requery
+End Sub
+
+Private Sub ClearSubItems()
+    Dim lngItemCount As Long
+    lngItemCount = CurrentDb.TableDefs("lt_SubmitMaterials").RecordCount
+    If lngItemCount > 0 Then
+        Dim strClear As String
+        strClear = "DELETE * FROM lt_SubmitMaterials;"
+        CurrentDb.Execute strClear, dbFailOnError
+     End If
+    IveChanged = False
+End Sub
+
+Private Sub Form_Load()
+    DoCmd.MoveSize , , 10625, 7500
+End Sub

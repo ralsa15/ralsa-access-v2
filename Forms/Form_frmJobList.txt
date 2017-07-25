@@ -1,0 +1,152 @@
+Option Compare Database
+Option Explicit
+
+Private Sub ApplySavedFilter_Click()
+    OpenFilterFavorites Me
+End Sub
+
+Private Sub cbActiveFilters_AfterUpdate()
+    Select Case Me.cbActiveFilters
+        Case 1 'Active
+            Me.chkApproved = False
+            Me.chkRejected = False
+        Case 2 'Complete
+            Me.chkApproved = True
+            Me.chkRejected = False
+        Case 3 'Cancelled/Closed
+            Me.chkApproved = False
+            Me.chkRejected = True
+        Case 4 'All
+            Me.chkApproved = True
+            Me.chkRejected = True
+     End Select
+    
+    ChangeRecordSource Me
+    
+End Sub
+
+Private Sub cbAssignedTo_DblClick(Cancel As Integer)
+    DoCmd.OpenForm "Contact Details", acNormal, , "[Contact Name] = '" & cbAssignedTo & "'", acFormReadOnly
+End Sub
+
+Private Sub cbDivReviewer_DblClick(Cancel As Integer)
+    DoCmd.OpenForm "Contact Details", acNormal, , "[Contact Name] = '" & cbDivReviewer & "'", acFormReadOnly
+End Sub
+
+Private Sub cboFilterFavorites_AfterUpdate()
+    Filters_ApplyFilterFavorite Me.ActiveControl
+    'Me.SearchClear.Visible = True
+End Sub
+
+Private Sub cboFilterFavorites_GotFocus()
+    Me.cboFilterFavorites.Requery
+End Sub
+
+Private Sub chkApproved_Click()
+    ChangeRecordSource Me
+End Sub
+
+Private Sub chkRejected_Click()
+    ChangeRecordSource Me
+End Sub
+
+Private Sub cmdClose_Click()
+    DoCmd.Close acForm, "frmJobList"
+    RequeryForm
+End Sub
+
+Private Sub cmdNewJob_Click()
+    DoCmd.OpenForm "frmNewSubmission", acNormal, , , , acWindowNormal, 1
+End Sub
+
+Private Sub Form_Current()
+    If Me.Filter <> "" Then
+        Me.SearchClear.Visible = True
+     Else
+        Me.SearchClear.Visible = False
+     End If
+End Sub
+
+Private Sub Form_GotFocus()
+    Dim lngPK As Long 'Primary Key Data Type
+    
+    lngPK = Me.anAutoNumber 'Current Record
+    Me.Requery
+    
+    With Me.RecordsetClone
+        .FindFirst "anAutoNumber = " & lngPK
+        If Not .NoMatch Then
+            Me.Bookmark = .Bookmark
+         End If
+     End With
+End Sub
+
+Private Sub Form_Load()
+    Dim UserID As String, RecSource As String
+    UserID = useLocalVar("lv_sUserName")
+    RecSource = Me.RecordSource
+    
+    Dim DefaultFilterID As Long, FilterString As String
+    'DefaultFilterID = DLookup("[intDefaultFilter]", "[lt_FormSettings]", "[txtFormName] = '" & Me.Name & "'")
+    'FilterString = DLookup("[FilterString]", "lt_Filters", "ID = " & DefaultFilterID)
+    FilterString = DLookup("[FilterString]", "lt_Filters", "ObjectName = '" & Me.Name & "' AND Default = TRUE")
+    Me.Filter = MyFilter(Me, FilterString)
+    Me.FilterOn = True
+    'DoCmd.MoveSize , , 23040, 10680
+    DoCmd.Maximize
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+'    Dim UserID As String, RecSource As String
+'    UserID = useLocalVar("lv_sUserName")
+'    RecSource = Me.RecordSource
+'
+'    Dim DefaultFilterID As Long, FilterString As String
+'    'DefaultFilterID = DLookup("[intDefaultFilter]", "[lt_FormSettings]", "[txtFormName] = '" & Me.Name & "'")
+'    'FilterString = DLookup("[FilterString]", "lt_Filters", "ID = " & DefaultFilterID)
+'    FilterString = DLookup("[FilterString]", "lt_Filters", "ObjectName = '" & Me.Name & "' AND Default = TRUE")
+'    Me.Filter = MyFilter(Me, FilterString)
+'    Me.FilterOn = True
+End Sub
+
+Private Sub SearchBox_Change()
+    If Nz(Me.SearchBox.Text) = "" Then
+        Me.Form.Filter = ""
+        Me.FilterOn = False
+     ElseIf Me.SearchBox.ListIndex <> -1 Then
+        Me.Form.Filter = "[JobNumber] = '" & Me.SearchBox.Text & "'"
+        Me.FilterOn = True
+     Else
+        Me.Form.Filter = "[JobNumber] Like '*" & Me.SearchBox.Text & "*'"
+        Me.FilterOn = True
+     End If
+
+    Me.SearchBox.SetFocus
+    Me.SearchBox.SelStart = Len(Me.SearchBox.Text)
+
+End Sub
+
+Private Sub SearchClear_Click()
+    ClearFilter Me
+    Me.Filter = vbNullString
+End Sub
+
+Private Sub tbJobName_DblClick(Cancel As Integer)
+    DoCmd.OpenForm "frmJobDetails", acNormal, , "[anAutoNumber] = " & anAutoNumber & "", acFormEdit, acWindowNormal
+'    Me.Requery
+End Sub
+
+Private Sub tbJobNumber_Click()
+    DoCmd.OpenForm "frmJobDetails", acNormal, , "[anAutoNumber] = " & Me.anAutoNumber & "", acFormEdit, acWindowNormal
+'    Me.Requery
+End Sub
+
+Private Sub tbSubmissionID_Click()
+    Select Case Me.JobType
+        Case "Packaging"
+            DoCmd.OpenForm "frmSubmissionDetails", acNormal, , "[stSubmissionEntry] = '" & Me.tbSubmissionID & "'", acFormEdit, acWindowNormal
+        Case "Ad/Prom", Null
+            DoCmd.OpenForm "frmJobDetails", acNormal, , "[anAutoNumber] = " & Me.anAutoNumber & "", acFormEdit, acWindowNormal
+     End Select
+'    Me.Requery
+End Sub

@@ -1,0 +1,1060 @@
+Option Compare Database
+Option Explicit
+
+Private Sub cbForm_AfterUpdate()
+    cbForm_Change
+End Sub
+
+Private Sub cbForm_Change()
+    
+    With Me
+        Select Case .cbForm
+            Case 1 'F1
+                .cbLanguages.Enabled = True
+                .cbLanguages.Visible = True
+                .cbLanguages = 1
+                
+                .chk_Ctry_AusNZ.Visible = True
+                .chk_Ctry_Canada.Visible = True
+                .chk_Ctry_EU.Visible = True
+                .chk_Ctry_Japan.Visible = True
+                .chk_Ctry_LatinAmerica.Visible = True
+                .chk_Ctry_US.Visible = True
+            Case 2 'F2
+                .cbLanguages = 0
+                .cbLanguages.Enabled = False
+                .cbLanguages.Visible = False
+                
+                .chk_Ctry_AusNZ.Visible = True
+                .chk_Ctry_Canada.Visible = True
+                .chk_Ctry_EU.Visible = True
+                .chk_Ctry_Japan.Visible = True
+                .chk_Ctry_LatinAmerica.Visible = True
+                .chk_Ctry_US.Visible = True
+            Case 3 'F4
+                .cbLanguages.Enabled = True
+                .cbLanguages.Visible = True
+                .cbLanguages = 1
+                
+                .chk_Ctry_AusNZ.Visible = True
+                .chk_Ctry_Canada.Visible = True
+                .chk_Ctry_EU.Visible = True
+                .chk_Ctry_Japan.Visible = True
+                .chk_Ctry_LatinAmerica.Visible = True
+                .chk_Ctry_US.Visible = True
+            Case 4 'F6
+            Case 5 'F7
+            Case 6 'F13
+                .cbLanguages = 0
+                .cbLanguages.Enabled = False
+                .cbLanguages.Visible = False
+                
+                .chk_Ctry_AusNZ = False
+                .chk_Ctry_Canada = False
+                .chk_Ctry_EU = False
+                .chk_Ctry_Japan = False
+                .chk_Ctry_LatinAmerica = False
+                .chk_Ctry_US = False
+                .chk_Ctry_AusNZ.Visible = False
+                .chk_Ctry_Canada.Visible = False
+                .chk_Ctry_EU.Visible = False
+                .chk_Ctry_Japan.Visible = False
+                .chk_Ctry_LatinAmerica.Visible = False
+                .chk_Ctry_US.Visible = False
+                
+            Case 7  'F20
+                .cbApproverQA.Enabled = False
+                .cbApproverQA.Visible = False
+                .cbDivReviewer.Enabled = False
+                .cbDivReviewer.Visible = False
+                .cbMedDevice.Enabled = False
+                .cbMedDevice.Visible = False
+                .cbLanguages.Enabled = False
+                .cbLanguages.Visible = False
+                
+            
+         End Select
+     End With
+    DefaultLabeler
+    SummaryUpdate
+End Sub
+
+Private Sub cbInitiator_AfterUpdate()
+    Me.cbDivReviewer = Me.cbInitiator
+    SummaryUpdate
+End Sub
+
+Private Sub cbJobType_AfterUpdate()
+    Me.Visible = False
+    DoCmd.Echo False
+    With Me
+        Select Case cbJobType
+            Case 1 'Collateral
+                .Auto_Title0.Caption = "New Ad/Prom Job"
+                .cmd_Adobe.Visible = False
+                .Caption = "New Ad/Prom Job"
+                .cbForm.Enabled = False
+                .cbForm.Visible = False
+                .cbForm.Value = Null
+                .cbLanguages.Visible = False
+                .cbLanguages.Value = Null
+                .cbLanguages.Enabled = False
+                .cbMedDevice.Visible = False
+                .cbMedDevice.Value = Null
+                .cbMedDevice.Enabled = False
+                .tbVendor.Value = Null
+                .tbVendor.Enabled = True
+                .tbVendor.Visible = True
+                .tbVendor.StatusBarText = "Job Number"
+                .Label_Vendor.Caption = "Job Number"
+                .cbApproverQA.Value = Null
+                .cbApproverQA.Enabled = False
+                .cbApproverQA.Visible = False
+                '.chkMasterLabel.Enabled = False
+                '.chkMasterLabel.Visible = False
+                .lbxMaterials.Enabled = False
+                .lbxMaterials.Visible = False
+                .Label_ItemLink.Visible = False
+                .tbVtNotes.Enabled = False
+                .tbVtNotes.Visible = False
+                '.cbDivision.RowSource = "SELECT tblDivisions_SubGroups.ID, tblDivisions.ID, txtDivNumber, txtDivName FROM qryDivSubSpecList WHERE Not IsNull(fkPrimaryColRA);"
+                .cbDivision.RowSource = "SELECT DISTINCT tblDivisions_SubGroups.ID AS SubID, tblDivisions.ID AS DivID, tblDivisions.txtDivNumber, IIf([tblDivisions].[ID]<=26,[tblDivisions].[txtDivName],[tblDivisions].[txtDivName]+' | '+[tblDivisions_SubGroups].[txtSubGroup]) AS GrpName, tblDivisions_SubGroups.fkPrimaryColRA, tblDivisions.txtDivName " & _
+                        "FROM tblDivisions INNER JOIN tblDivisions_SubGroups ON tblDivisions.ID = tblDivisions_SubGroups.fkDivID " & _
+                        "WHERE (((IsNull([tblDivisions_SubGroups].[fkPrimaryColRA])) = False)) " & _
+                        "ORDER BY tblDivisions.txtDivNumber;"
+
+                .cbDivision.Value = Null
+                .cbInitiator.Value = Null
+                .cbInitiator.Visible = False
+                .cbInitiator.Enabled = False
+                .cbDivReviewer.Value = Null
+                .cbDivReviewer.Visible = False
+                .cbDivReviewer.Enabled = False
+                .cbRaLabeler.Value = Null
+                '.Label_CountryRegions.Visible = False
+                .chk_Ctry_AusNZ.Visible = False
+                .chk_Ctry_AusNZ.Enabled = False
+                .chk_Ctry_Canada.Visible = False
+                .chk_Ctry_Canada.Enabled = False
+                .chk_Ctry_EU.Visible = False
+                .chk_Ctry_EU.Enabled = False
+                .chk_Ctry_Japan.Visible = False
+                .chk_Ctry_Japan.Enabled = False
+                .chk_Ctry_LatinAmerica.Visible = False
+                .chk_Ctry_LatinAmerica.Enabled = False
+                .chk_Ctry_US.Visible = False
+                .chk_Ctry_US.Enabled = False
+                .cbArtReviewer.Visible = False
+                .cbArtReviewer.Enabled = False
+                .cbArtReviewer.Value = Null
+                .tglDefaults.Visible = False
+                .tglDefaults.Enabled = False
+                .Frame_Hot.Visible = False
+                .Frame_Hot.Enabled = False
+                
+                .cbDivision.Top = 1440
+                .cbRaLabeler.Top = 1440
+                .Label_ItemLink.Height = 1
+                .Label_ItemLink.Top = 1500
+                .cbInitiator.Height = 1
+                .cbDivReviewer.Height = 1
+                .cbApproverQA.Height = 1
+                .cbArtReviewer.Height = 1
+                .cbLanguages.Height = 1
+                .cbMedDevice.Height = 1
+                .lbxMaterials.Height = 1
+                .tbVtNotes.Height = 1
+                .lbxMaterials.Top = 2280
+                .Jobs_Page.Height = 1837
+                .tabTasks.Height = 2092
+                .Detail.Height = 2169
+                .InsideHeight = 5571
+                
+            Case 2 'Packaging
+                .Auto_Title0.Caption = "Form Submission"
+                .cmd_Adobe.Visible = True
+                .Caption = "New Form Submission"
+                .cbForm.Enabled = True
+                .cbForm.Visible = True
+                .cbLanguages.Visible = True
+                .cbLanguages.Value = .cbLanguages.ItemData(0)
+                .cbLanguages.Enabled = True
+                .cbMedDevice.Visible = True
+                .cbMedDevice.Value = .cbMedDevice.ItemData(5)
+                .cbMedDevice.Enabled = True
+                .tbVendor.Value = Null
+                .tbVendor.Enabled = True
+                .tbVendor.Visible = True
+                .tbVendor.StatusBarText = "Vendor"
+                .Label_Vendor.Caption = "Vendor"
+                .cbApproverQA.Enabled = True
+                .cbApproverQA.Visible = True
+                '.chkMasterLabel.Enabled = True
+                '.chkMasterLabel.Visible = True
+                .lbxMaterials.Enabled = True
+                .lbxMaterials.Visible = True
+                .Label_ItemLink.Visible = True
+                .tbVtNotes.Enabled = True
+                .tbVtNotes.Visible = True
+                .cbDivision.RowSource = "SELECT SubID, DivID, txtDivNumber, GrpName FROM qry_RA_DivisionSubSpecialists WHERE IsNumeric(txtDivNumber);"
+                .cbDivision.Value = Null
+                .cbInitiator.Value = Null
+                .cbInitiator.Visible = True
+                .cbInitiator.Enabled = True
+                .cbDivReviewer.Value = Null
+                .cbDivReviewer.Visible = True
+                .cbDivReviewer.Enabled = True
+                .cbRaLabeler.Value = Null
+                .Label_CountryRegions.Visible = True
+                .chk_Ctry_AusNZ.Visible = True
+                .chk_Ctry_AusNZ.Enabled = True
+                .chk_Ctry_Canada.Visible = True
+                .chk_Ctry_Canada.Enabled = True
+                .chk_Ctry_EU.Visible = True
+                .chk_Ctry_EU.Enabled = True
+                .chk_Ctry_Japan.Visible = True
+                .chk_Ctry_Japan.Enabled = True
+                .chk_Ctry_LatinAmerica.Visible = True
+                .chk_Ctry_LatinAmerica.Enabled = True
+                .chk_Ctry_US.Visible = True
+                .chk_Ctry_US.Enabled = True
+                .cbArtReviewer.Visible = True
+                .cbArtReviewer.Enabled = True
+                .cbArtReviewer.Value = Null
+                .tglDefaults.Visible = False
+                .tglDefaults.Enabled = True
+                .Frame_Hot.Visible = True
+                .Frame_Hot.Enabled = True
+                
+                .InsideHeight = 11125 '10404 '10980
+                .Detail.Height = 9720 '9216 '9792
+                .tabTasks.Height = 9180 '8640
+                .Jobs_Page.Height = 9030 '8484.048
+                .cbInitiator.Height = 315
+                .cbDivReviewer.Height = 315
+                .cbApproverQA.Height = 315
+                .cbArtReviewer.Height = 315
+                .cbLanguages.Height = 315
+                .cbMedDevice.Height = 315
+                .cbDivision.Top = 1500.048 '1800
+                .cbRaLabeler.Top = 1500.048 '1800
+                .lbxMaterials.Height = 2880
+                .tbVtNotes.Height = 720
+                .lbxMaterials.Top = 4170 '3780 ' 4320
+                .Label_ItemLink.Height = 840
+                .Label_ItemLink.Top = 4170
+
+         End Select
+     End With
+    Me.tglDefaults = True
+    SummaryUpdate
+    DoCmd.Echo True
+    Me.Visible = True
+End Sub
+
+Private Sub cbMedDevice_AfterUpdate()
+    If Me.tglDefaults Then DefaultLabeler
+    SummaryUpdate
+End Sub
+
+Private Sub cbRaLabeler_AfterUpdate()
+    SummaryUpdate
+    Me.tglDefaults = False
+    Me.tglDefaults.Visible = True
+    Me.tglDefaults.Enabled = True
+    Me.cbArtReviewer = Me.cbRaLabeler
+    tglDefaults_AfterUpdate
+End Sub
+
+Private Sub chk_Ctry_EU_AfterUpdate()
+    If Me.tglDefaults Then DefaultLabeler
+End Sub
+
+Private Sub chkIncludeInVT_AfterUpdate()
+    SummaryUpdate
+End Sub
+
+Private Sub cmdCancel_Click()
+    Me.Undo
+    DoCmd.Close acForm, Me.Name
+End Sub
+
+Private Sub cmdClear_Click()
+    Dim ctrl As Control
+    Me.Undo
+    Me.cbArtReviewer = Null
+
+    CurrentDb.Execute "DELETE * FROM lt_Submissions;", dbFailOnError
+    CurrentDb.Execute "DELETE * FROM lt_SubmitMaterials;", dbFailOnError
+
+        For Each ctrl In Me.Controls
+            If ctrl.Tag Like "*ReqPack*" Or ctrl.Name = "lbxMaterials" Then
+                ctrl.BorderColor = 0
+                ctrl.BackColor = 16777215
+             End If
+            If ctrl.ControlType = acCheckBox Then
+                ctrl.Value = ctrl.DefaultValue
+             End If
+         Next
+    Me.lbxMaterials.Requery
+    Me.Requery
+End Sub
+
+Private Sub cmdClose_Click()
+    'Called Functions/Subs:
+    '   Form Function "SubmissionEntry" - Calculates/builds the Submission ID (Removed as of 1/5/2015)
+    '   Form Sub    "ItemSaves" - Saves Submission Data to DB (and clears the local table) (Removed as of 1/5/2015)
+    '   Form Function "EmailAcknowledge" - Creates string to populate form for Fast Email (Removed as of 1/5/2015)
+    '   "SubSaving"
+    '   "SaveAndCloseForm"
+    '   Form Function "SubValidate" - Tests for Required Fields
+    
+    Dim RequiredFields As Boolean
+    RequiredFields = SubValidate
+    If RequiredFields = False Then Exit Sub
+    
+    SubSaving (Me.cbJobType)
+    
+    SaveAndCloseForm Me
+    
+    Exit Sub
+IErrored:
+    'To Update:
+    MsgBox "Error: " & Err.Number & vbNewLine & Err.Description, vbCritical, "Error"
+    
+End Sub
+
+Private Function SubSaving(EntryType As Long)
+    '** 3/24/2016 - Added Ad/Prom steps for saving the submission
+    Dim strEmail As String
+    
+    On Error GoTo IErrored
+    
+    Me.tbSubDateTime = Now
+    
+    'Creates Submission ID using Prefix "C" for Ad/Prom and "S" for Packaging
+    Me.tbSubmissionEntry = SubmissionEntry
+    DoCmd.RunCommand acCmdSaveRecord
+    Me.Visible = False
+    
+    Select Case EntryType
+        Case 1 ' Ad/Prom
+            SaveAdProm Me.tbSubmissionEntry
+        Case 2 ' Packaging
+            strEmail = EmailAcknowledge
+            If ItemSaves(Me.tbSubmissionEntry) Then
+                'Launches 'Email Body' Form for easy Copy/Paste of Email Text
+                DoCmd.OpenForm "frmEmailBody", acNormal, , , , acDialog, strEmail
+             End If
+     End Select
+    Exit Function
+    
+IErrored:
+    'To Update:
+    MsgBox "Error: " & Err.Number & vbNewLine & Err.Description, vbCritical, "Error"
+    
+End Function
+
+
+Private Sub cmdSaveAndNew_Click()
+    'Calls Functions/Subs: _
+        Uses the "Save and Close" <cmdClose_Click> functionality, and then reopens the New Submission Form
+
+    cmdClose_Click
+    DoCmd.OpenForm "frmNewSubmission"
+
+    Exit Sub
+IErrored:
+    'To Update:
+    MsgBox "Error: " & Err.Number & vbNewLine & Err.Description, vbCritical, "Error"
+    
+End Sub
+
+Private Sub Form_Close()
+    On Error Resume Next
+    Me.Undo
+    DoCmd.SetWarnings False
+    
+    DoCmd.RunSQL "DELETE * FROM lt_Submissions;"
+    DoCmd.RunSQL "DELETE * FROM lt_SubmitMaterials;"
+    
+    DoCmd.SetWarnings True
+    
+End Sub
+
+Private Sub cbDivision_AfterUpdate()
+    If Me.tglDefaults Then DefaultLabeler
+    SummaryUpdate
+End Sub
+
+Private Sub cbDivision_BeforeUpdate(Cancel As Integer)
+    
+    Select Case Me.cbJobType
+        Case 1 'Ad/Prom
+            Dim sqlDivisionContacts As String
+            sqlDivisionContacts = "SELECT DISTINCT qryContactGroups.ID, qryContactGroups.[Contact Name], qryContactGroups.[File As] " & _
+                                "FROM qryContactGroups " & _
+                                "ORDER BY qryContactGroups.[File As]; "
+            
+            Me.cbDivReviewer.RowSource = sqlDivisionContacts
+            Me.cbInitiator.RowSource = sqlDivisionContacts
+        Case 2 'Packaging
+            Me.cbDivReviewer.RowSource = ContactFilterForm(Me.cbDivision)
+            Me.cbInitiator.RowSource = ContactFilterForm(Me.cbDivision)
+            'Debug.Print Me.cbDivision.Column(0) & "|" & Me.cbDivision.Column(1) & "; " & Me.fkRaLabeler
+    End Select
+    
+End Sub
+
+Function SubmissionEntry() As String
+    'Called Functions/Subs:
+    '   Module.Function "myfunctions.useLocalVar" - (REMOVED 12/16/2015; See Below) Captures Local Variable stored in Client Table
+    
+    'Changes:
+    '   12/16/2015  -   Changed from User based Submission ID to Division based Submission ID
+    '   3/24/2016   -   Added Ad/Prom submission ID generator using 'C' instead of S
+    
+    Dim strDivID As String, strDivNum As String, strSubCnt As String, rsSubCnt As Object, iSubCnt As Long
+    
+    strDivID = Me.cbDivision.Column(1)
+    
+    strSubCnt = "SELECT * FROM tblDivisions WHERE tblDivisions.ID = " & strDivID & " ;"
+    Set rsSubCnt = CurrentDb.OpenRecordset(strSubCnt)
+    
+    With rsSubCnt
+        .FindFirst "[ID] = " & strDivID
+        iSubCnt = .iSubmissionCnt
+        strDivNum = .txtDivNumber
+        .Edit
+        .iSubmissionCnt = iSubCnt + 1
+        .Update
+     End With
+
+    Select Case Me.cbJobType
+        Case 1
+            SubmissionEntry = "C"
+        Case 2
+            SubmissionEntry = "S"
+     End Select
+        
+    SubmissionEntry = SubmissionEntry & Right(Format(Now(), "YYYY"), 2) & Format(strDivNum, "00#") & "." & Format(iSubCnt, "000#")
+    
+    rsSubCnt.Close
+
+End Function
+
+Function ItemSaves(strSubmission As String) As Boolean
+    
+'    'Using ADODB coding requires adding "Microsoft ActiveX Data Objects 6.1 Library"
+'    'and/or "Microsoft ActiveX Data Objects Recordset 6.0 Library" to References
+
+
+    'Change Log
+    '   12/15/2015  -   Moved the inserts to tblJobLog to after the submission entry is complete
+    '                   and the Foreign Key can be identified to add to tblJobLog
+
+    On Error GoTo IError
+    'DoCmd.SetWarnings False
+    
+'    'Reset the Division field to be the Parent Division since Subdivision is irrelevant past the New Submission Form
+'    Me.cbDivision = Me.cbDivision.Column(0)
+    
+    DBEngine(0).BeginTrans
+
+    Dim sqlSubmInsert As String, sqlSubmItmsInsert As String, sqlIdUpdate As String, sqlFindID As String
+    Dim sqlAddCountry As String
+    Dim iSubID As Long
+    
+    sqlSubmInsert = "INSERT INTO tblSubmissions ( stSubmissionEntry, dtSubDateTime, dtStatusDate, fkFormStatus, fkInitiator, fkApproverQA, fkDivReviewer, fkDivision, " & _
+                    "txtVendor, fkJobType, fkRequestForm, fkRaLabeler, fkLanguages, dtReceivedRA, fkUDI, fkMedDeviceClass, FlaggedHot ) " & _
+                    "SELECT '" & strSubmission & "', '" & Me.tbSubDateTime & "', '" & Me.tbSubDateTime & "', '1', lt_Submissions.fkInitiator, " & _
+                    "lt_Submissions.fkApproverQA, lt_Submissions.fkDivReviewer, " & Me.cbDivision.Column(1) & ", lt_Submissions.txtVendor, lt_Submissions.fkJobType, lt_Submissions.fkRequestForm, " & _
+                    "lt_Submissions.fkRaLabeler, lt_Submissions.fkLanguages, lt_Submissions.dtReceivedRA, " & _
+                    "lt_Submissions.fkUDI, lt_Submissions.MedDeviceClass, lt_Submissions.FlaggedHot " & _
+                    "FROM lt_Submissions LEFT JOIN tblSubmissions ON lt_Submissions.stSubmissionEntry = tblSubmissions.stSubmissionEntry; "
+
+    sqlFindID = "SELECT anSubmissionID, stSubmissionEntry FROM tblSubmissions WHERE stSubmissionEntry = '" & strSubmission & "'"
+
+    Debug.Print sqlSubmInsert
+    CurrentDb.Execute sqlSubmInsert, dbFailOnError
+    
+    Dim rst As Object
+    Set rst = CurrentDb.OpenRecordset(sqlFindID)
+    
+    With rst
+        .FindFirst "[stSubmissionEntry] = '" & strSubmission & "'"
+        iSubID = .anSubmissionID
+     End With
+    rst.Close
+
+    sqlSubmItmsInsert = "INSERT INTO tblJobLog ( fkSubmissionID, txtSubmissionEntry, txtJobNumber, txtJobName, txtMaterialNum, fkDivReviewer, fkJobStatus, " & _
+                    "fkRaLabeler, dtLastUpdate, dtReceivedRA, fkStatusRA ) " & _
+                    "SELECT '" & iSubID & "', '" & strSubmission & "', lt_SubmitMaterials.txtJobNumber, lt_SubmitMaterials.txtJobName, lt_SubmitMaterials.txtMaterial, '" & Me.cbDivReviewer & "', " & _
+                    "'24', '" & Me.cbArtReviewer & "', '" & Me.tbSubDateTime & "', '" & Me.dtReceivedRA & "', '1' " & _
+                    "FROM lt_SubmitMaterials " & _
+                    "WHERE lt_SubmitMaterials.txtMaterial <> '' AND Not IsNull(lt_SubmitMaterials.txtMaterial); "
+
+    Debug.Print sqlSubmItmsInsert
+    CurrentDb.Execute sqlSubmItmsInsert, dbFailOnError
+
+    SaveSubmission (iSubID)
+    
+    sqlAddCountry = "INSERT INTO join_SubCountry ( fkSubID, US_Mkt, Canada_Mkt, EU_Mkt, Japan_Mkt, AusNZ_Mkt, LatinAmerica_Mkt ) " & _
+                        "SELECT " & iSubID & ", " & Me.chk_Ctry_US & ", " & Me.chk_Ctry_Canada & ", " & Me.chk_Ctry_EU & ", " & _
+                        Me.chk_Ctry_Japan & ", " & Me.chk_Ctry_AusNZ & ", " & Me.chk_Ctry_LatinAmerica
+    CurrentDb.Execute sqlAddCountry, dbFailOnError
+    
+'    Dim Countries As Collection
+'    Set Countries = New Collection
+'
+'    If Me.chk_Ctry_US Then Countries.Add (1)
+'    If Me.chk_Ctry_Canada Then Countries.Add (2)
+'    If Me.chk_Ctry_EU Then Countries.Add (3)
+'    If Me.chk_Ctry_Japan Then Countries.Add (4)
+'    If Me.chk_Ctry_AusNZ Then Countries.Add (5)
+'    If Me.chk_Ctry_LatinAmerica Then Countries.Add (6)
+'
+'    Dim i As Long, sqlAddCountry As String
+'    For i = 1 To Countries.Count
+'        sqlAddCountry = "INSERT INTO join_SubCountry ( fkSubID, fkCountryRegionID ) " & _
+'                        iSubID & ", " & Countries(i)
+'        CurrentDb.Execute sqlAddCountry, dbFailOnError
+'     Next iSubID
+'    sqlAddCountry = Nothing
+'    Set Countries = Nothing
+    
+    ' Add the submission to the Daily Upload (formerly Daily Ticket Upload)
+    Dim sqlAddToDU As String
+    
+        sqlAddToDU = "INSERT INTO tmp_DailyUpload ( SubmissionID, [Job Name], [Job Number], ItemNumber, DivisionCode, ProductManager, Status, " & _
+                    "RA_Labeler, recd_RA, Vendor_Code, Form_Type, Packaging, Languages, Medical_Device_Class ) " & _
+                    "SELECT '" & strSubmission & "', lt_SubmitMaterials.txtJobName, lt_SubmitMaterials.txtJobNumber, lt_SubmitMaterials.txtMaterial, '" & Me.cbDivision.Column(2) & "', '" & Me.cbDivReviewer.Column(1) & "', " & _
+                    "'Regulatory', '" & Me.cbArtReviewer.Column(1) & "', '" & Me.tbDateReceived & "', '" & Me.tbVendor & "', '" & Me.cbForm.Column(1) & "', '" & 1 & "', '" & Me.cbLanguages.Column(1) & _
+                    "', '" & Me.cbMedDevice.Column(1) & "' " & _
+                    "FROM lt_SubmitMaterials " & _
+                    "WHERE lt_SubmitMaterials.txtMaterial <> '' AND Not IsNull(lt_SubmitMaterials.txtMaterial); "
+                    ' 1/26/2016 - Changed the Select for Status from " "'" & StatusText & "'" " to "Regulatory"
+                    ' 11/16/2016 - Filtered for no idem number.
+
+    CurrentDb.Execute sqlAddToDU, dbFailOnError
+    
+    CurrentDb.Execute "DELETE * FROM lt_Submissions;", dbFailOnError
+    CurrentDb.Execute "DELETE * FROM lt_SubmitMaterials;", dbFailOnError
+
+    Forms![frmNewSubmission].Undo
+
+    DBEngine(0).CommitTrans
+
+    UpdateListTextFields 1, iSubID
+    UpdateListTextFields 2, iSubID
+
+    ItemSaves = True
+SubEnd:
+    'DoCmd.SetWarnings True
+    Exit Function
+
+IError:
+    MsgBox "I errored." & vbNewLine & "Err: " & Err.Number & " : " & Err.Description
+    DBEngine(0).Rollback
+    ItemSaves = False
+    Resume SubEnd
+End Function
+
+Sub SaveAdProm(strSubmission As String)
+    
+'    'Using ADODB coding requires adding "Microsoft ActiveX Data Objects 6.1 Library"
+'    'and/or "Microsoft ActiveX Data Objects Recordset 6.0 Library" to References
+
+    On Error GoTo IError
+
+    
+    DBEngine(0).BeginTrans
+
+    Dim sqlSubmInsert As String, sqlJobInsert As String, sqlIdUpdate As String, sqlFindID As String
+    Dim iSubID As Long
+    
+    sqlSubmInsert = "INSERT INTO tblSubmissions ( stSubmissionEntry, dtSubDateTime, dtStatusDate, fkInitiator, fkDivReviewer, fkDivision, " & _
+                    "fkJobType, fkRaLabeler, dtReceivedRA ) " & _
+                    "SELECT '" & strSubmission & "', lt_Submissions.dtSubDateTime, lt_Submissions.dtSubDateTime, lt_Submissions.fkInitiator, " & _
+                    "lt_Submissions.fkDivReviewer, lt_Submissions.fkDivision, lt_Submissions.fkJobType, " & _
+                    "lt_Submissions.fkRaLabeler, lt_Submissions.dtReceivedRA " & _
+                    "FROM lt_Submissions LEFT JOIN tblSubmissions ON lt_Submissions.stSubmissionEntry = tblSubmissions.stSubmissionEntry; "
+
+    sqlFindID = "SELECT anSubmissionID, stSubmissionEntry FROM tblSubmissions WHERE stSubmissionEntry = '" & strSubmission & "'"
+
+    Debug.Print sqlSubmInsert
+    CurrentDb.Execute sqlSubmInsert, dbFailOnError
+    
+    Dim rst As Object
+    Set rst = CurrentDb.OpenRecordset(sqlFindID)
+    
+    With rst
+        .FindFirst "[stSubmissionEntry] = '" & strSubmission & "'"
+        iSubID = .anSubmissionID
+     End With
+    rst.Close
+
+    sqlJobInsert = "INSERT INTO tblJobLog ( fkSubmissionID, txtSubmissionEntry, txtJobName, txtJobNumber, fkJobStatus, " & _
+                    "fkRaLabeler, dtLastUpdate, dtReceivedRA ) " & _
+                    "SELECT '" & iSubID & "', '" & strSubmission & "', 'PENDING VT Synchronization', lt_Submissions.txtVendor, " & _
+                    "'36', '" & Me.fkRaLabeler & "', '" & Me.tbSubDateTime & "', '" & Me.dtReceivedRA & "' " & _
+                    "FROM lt_Submissions; "
+
+    Debug.Print sqlJobInsert
+    CurrentDb.Execute sqlJobInsert, dbFailOnError
+
+    SaveSubmission (iSubID)
+        
+    CurrentDb.Execute "DELETE * FROM lt_Submissions;", dbFailOnError
+    CurrentDb.Execute "DELETE * FROM lt_SubmitMaterials;", dbFailOnError
+
+    Forms!frmNewSubmission.Undo
+
+    DBEngine(0).CommitTrans
+
+    UpdateListTextFields 1, iSubID
+    UpdateListTextFields 2, iSubID
+
+SubEnd:
+    'DoCmd.SetWarnings True
+    Exit Sub
+
+IError:
+    MsgBox "I errored." & vbNewLine & "Err: " & Err.Number & " : " & Err.Description
+    DBEngine(0).Rollback
+    
+    Resume SubEnd
+End Sub
+
+Function EmailAcknowledge() As String
+    Dim strTimeDay As String
+
+    If Format(Now, "Short Time") > Format("12:00", "short time") Then
+        strTimeDay = "afternoon"
+        Else
+        strTimeDay = "morning"
+     End If
+    
+    EmailAcknowledge = "Good " & strTimeDay & _
+                    ", " & vbNewLine & "Your request has been assigned Submission ID: " & tbSubmissionEntry & ", and is assigned to " & _
+                    cbRaLabeler.Column(1) & " for review."
+
+End Function
+
+Sub SaveSubmission(Submission As Long)
+    'Called Functions/Subs:
+    '   Module Function "myfunctions.useLocalVar" - Captures Local Variable stored in Client Table
+    
+    ' Relies on prior levels turning on/off .SetWarnings
+    
+    Dim tstSubNote As Boolean, tstRaNote As Boolean, strNoteBy As String, strSummary As String, lngUserID As Long
+    Dim strActivityID As String, sqlSubNotes As String, dtTimeStamp As Date, ctrl As Control
+
+    On Error GoTo MyError
+
+    strNoteBy = useLocalVar("lv_sUserName")
+    lngUserID = useLocalVar("lv_iContactID")
+    dtTimeStamp = Now
+    strActivityID = Format(lngUserID, "000") & "." & Format(dtTimeStamp, "YYYYMMDDhhmmss")
+    strSummary = SummaryUpdate
+    If Me.tbDateReceived <> Date Then
+        dtTimeStamp = Me.tbDateReceived
+     End If
+
+    Dim rstLogAdd As String
+
+    rstLogAdd = "INSERT INTO Log_Activity ( fkSubID, txtActivity, txtActivityID, " & _
+                "dtActivityStamp, fkUserID, UserName, txtSummary, TransferVT, txtSubmissionID, dtRecorded ) " & _
+                "SELECT '" & Submission & "', 'Received', '" & strActivityID & "', '" & dtTimeStamp & _
+                "', " & lngUserID & ", '" & strNoteBy & "', " & Chr(34) & Me.tbVtNotes & Chr(34) & _
+                ", " & Me.chkIncludeInVT & ", '" & Me.tbSubmissionEntry & "', '" & Me.tbSubDateTime & "' ; "
+
+    Debug.Print rstLogAdd
+    'BeginTrans
+
+    CurrentDb.Execute rstLogAdd, dbFailOnError
+
+'>>>>> 1/17/2017  This was copied from Submission and/or Job Activity.  Could extract as it's own function
+        Dim sqlFindID As String, rstFindID As DAO.Recordset
+        sqlFindID = "SELECT ID FROM Log_Activity WHERE txtActivityID = " & Chr(34) & strActivityID & Chr(34)
+        Set rstFindID = CurrentDb.OpenRecordset(sqlFindID)
+        
+        Dim fkActivityID As Long
+        fkActivityID = rstFindID.Fields("ID")
+        Set rstFindID = Nothing
+'<<<<<
+
+        'If RA Notes are populated, records them in Log_RaSubNotes
+        If Not IsNull(Me.tbRAOnlyNotes) Then
+
+            sqlSubNotes = "INSERT INTO [Log_RaSubNotes] ( fkSubID, dtSubNote, txtNote, txtNoteBy, dtRecorded, fkActivityID) " & _
+                            "SELECT " & Submission & ", '" & dtTimeStamp & "', " & Chr(34) & Me.tbRAOnlyNotes & Chr(34) & _
+                            ", '" & strNoteBy & "', '" & dtTimeStamp & "', " & fkActivityID & " ; "
+            CurrentDb.Execute sqlSubNotes, dbFailOnError
+            
+         End If
+
+    'CommitTrans
+
+    Exit Sub
+
+MyError:
+    MsgBox "Unable to Record into 'Log_Activity': Sub 'SaveSubmission' failed." & vbNewLine & _
+        "Error: " & Err.Number & vbNewLine & "Descrp: " & Err.Description, vbCritical, "ERROR"
+End Sub
+
+Function SummaryUpdate()
+    Dim strSummary As String
+    strSummary = Format(Date, "MM/DD/YYYY") & " Received Submission" & IIf(IsNull(tbSubmissionEntry), "", " " & tbSubmissionEntry)
+    If Not IsNull(tbSubmissionEntry) Then
+        strSummary = "New Submission (ID: " & tbSubmissionEntry & ")"
+     Else
+        strSummary = "New Submission (ID: <PENDING SUBMISSION ID>)"
+     End If
+    
+    If Me.chkIncludeInVT And Not IsNull(Me.tbRAOnlyNotes) Then
+        strSummary = strSummary & "; " & Me.tbRAOnlyNotes
+     End If
+    
+    Me.tbVtNotes = strSummary
+End Function
+
+Private Sub Form_Load()
+    If Me.OpenArgs <> vbNullString Then
+        Me.cbJobType = Me.OpenArgs
+     End If
+    
+    Me.cbDivision.RowSource = "SELECT SubID, DivID, txtDivNumber, GrpName FROM qry_RA_DivisionSubSpecialists"
+    
+    cbJobType_AfterUpdate
+End Sub
+
+Private Sub Jobs_Page_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    ClearAll True, Me
+End Sub
+
+Private Sub Label_ItemLink_Click()
+    DoCmd.RunCommand acCmdSaveRecord
+    DoCmd.OpenForm "frmItemsSubmit", acNormal, , , acFormEdit, acDialog
+End Sub
+
+Private Function SubValidate() As Boolean
+    'Submission is Invalid until Proven Valid
+    SubValidate = False
+    
+    Dim TagTest As String
+    Dim ctrl As Control
+    Dim RequiredFields As Collection
+    Set RequiredFields = New Collection
+    Select Case Me.cbJobType
+        Case 1 'Ad/Prom
+            TagTest = "*ReqColl*"
+        Case 2 'Packaging
+            TagTest = "*ReqPack*"
+            If Me.lbxMaterials.ListCount < 2 Then
+                RequiredFields.Add "    - Provide Item List"
+                Me.lbxMaterials.BorderColor = 5722315
+                Me.lbxMaterials.BackColor = 12368362
+             Else
+                Me.lbxMaterials.BorderColor = 0
+                Me.lbxMaterials.BackColor = 16777215
+             End If
+     End Select
+    
+        For Each ctrl In Me.Controls
+            If ctrl.Tag Like TagTest Then
+                Debug.Print ctrl.Name & " | " & ctrl.Tag & " | " & ctrl.StatusBarText
+                If ctrl.Value = "" Or IsNull(ctrl.Value) Then
+                    RequiredFields.Add "    - " & ctrl.StatusBarText
+                    ctrl.BorderColor = 5722315
+                    ctrl.BackColor = 12368362
+                 Else
+                    ctrl.BorderColor = 0
+                    ctrl.BackColor = 16777215
+                 End If
+             End If
+         Next
+    
+    
+    Dim MyErrorCount As Long
+    MyErrorCount = RequiredFields.Count
+    
+    If MyErrorCount > 0 Then
+        Dim MyErrors As String, i As Long
+        MyErrors = "Cannot Process this Submission!" & vbNewLine & "Please provide values for the following required field(s):" & vbNewLine & ""
+        For i = 1 To MyErrorCount
+            MyErrors = MyErrors & vbNewLine & RequiredFields(i)
+         Next
+        
+        MsgBox MyErrors, vbCritical, "Submission Incomplete"
+     Else
+        SubValidate = True
+     End If
+    
+End Function
+
+Private Sub Label_ItemLink_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    fLabelMouseDown "Label_ItemLink"
+End Sub
+
+Private Sub Label_ItemLink_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "Label_ItemLink", Me, 16777214
+End Sub
+
+Private Function DefaultLabeler()
+    'Tests based on Division, Job Type, Form, Medical Device Class, and TEMP (Country/Region) selections _
+     to default RA Reviewer Fields to the Primary RA Responsible.  If no default, sets to user entering _
+     Submission
+    
+    'Called Functions/Subs:
+    '   Module Function "myfunctions.useLocalVar" - Captures Local Variable stored in Client Table
+    
+    Dim varX As Long, vRaDef As Long
+    Dim strSqlDivs As String, rsQueryDivs As Object
+   
+    'Requires a Division, else exit
+    If IsNull(Me.cbDivision) Then Exit Function
+    
+    '**Temporary for Process Improvement Data Capture (Ella Budynsky, Annette Covaliu, Su Miller) 7/14/2016
+    If chk_Ctry_EU Then
+        Select Case Me.cbDivision.Column(1)
+            Case 1, 6, 7, 11, 13, 14, 15, 18, 21, 22, 25, 26
+                vRaDef = 101    'Annette
+            Case 3, 4, 8, 9, 10, 16, 17, 19, 20, 23, 24
+                vRaDef = 3  'Ella
+         End Select
+        GoTo ResumeChg
+     End If
+    
+    If IsNull(Me.cbDivision) Then Exit Function
+    strSqlDivs = "SELECT * FROM qry_RA_DivisionSubSpecialists WHERE SubID = " & Me.cbDivision.Column(0) & ";"
+
+    Set rsQueryDivs = CurrentDb.OpenRecordset(strSqlDivs)
+    
+    On Error GoTo NoDefault
+    
+    Select Case Me.cbJobType
+        Case 1 'Collateral
+            vRaDef = rsQueryDivs.Fields("fkPrimaryColRA")
+        Case 2 'Packaging
+            Select Case Me.cbForm
+                Case 1, 6 'F1, F4, and F13
+                    vRaDef = rsQueryDivs.Fields("fkPrimaryPckRA")
+                Case 3
+                    If Me.cbDivision.Column(1) = 24 Then
+                        vRaDef = 3
+                     Else
+                        vRaDef = rsQueryDivs.Fields("fkPrimaryPckRA")
+                     End If
+                Case 2 'F2
+                        Select Case Me.cbMedDevice
+                            Case 1, 6 'Not a Device/Undetermined
+                                vRaDef = rsQueryDivs.Fields("fkFormF2RA")
+                            Case 2, 3 'Unclassified (Class 1)/Class 1
+                                vRaDef = rsQueryDivs.Fields("fkFormF2RA")
+                            Case 4, 5  'Class 2/Class 3
+                                vRaDef = rsQueryDivs.Fields("fkFormF2RA")
+'                                If IsNull(rsQueryDivs.Fields("fkUDI_Team")) Then
+'                                    vRaDef = rsQueryDivs.Fields("fkFormF2RA")
+'                                 Else
+'                                    vRaDef = rsQueryDivs.Fields("fkUDI_Team")
+'                                 End If
+                         End Select 'End Me.cbMedDevice
+             End Select 'End Me.cbForm
+    End Select 'End Me.cbJobType
+
+ResumeChg:
+    'Change Drop Down for RA Labeler to Reflect the Primary RA Specialist Currently Assigned
+    Me.cbRaLabeler = vRaDef
+    Me.cbArtReviewer = vRaDef
+    
+    Exit Function
+NoDefault:
+    vRaDef = useLocalVar("lv_iContactID")
+    GoTo ResumeChg
+
+End Function
+
+Private Sub tglDefaults_AfterUpdate()
+    DoCmd.Echo False
+    If Me.tglDefaults Then
+        Me.tglDefaults.Bevel = 2
+        Me.cbRaLabeler.SetFocus
+        Me.tglDefaults.Visible = False
+        Me.tglDefaults.Caption = "Applying" & vbNewLine & "Defaults"
+        DefaultLabeler
+     Else
+        Me.tglDefaults.Bevel = 1
+        Me.tglDefaults.Caption = "Reset" & vbNewLine & "Defaults"
+     End If
+    DoCmd.Echo True
+End Sub
+
+Private Sub tbRAOnlyNotes_AfterUpdate()
+    If Me.tbRAOnlyNotes = "" Or IsNull(Me.tbRAOnlyNotes) Then
+        Me.chkIncludeInVT.Enabled = False
+        Me.chkIncludeInVT = Null
+     End If
+    SummaryUpdate
+End Sub
+
+Private Sub tbRAOnlyNotes_Change()
+    Me.chkIncludeInVT.Enabled = True
+End Sub
+
+Sub AcrobatTest()
+    Dim adobeApp As Object, TestPdf As AcroPDDoc
+    Dim jso As Object, TestForm As Object, i As Long, FieldCount As Long, Field As Variant
+    
+    Set adobeApp = CreateObject("AcroExch.App")
+    Set TestPdf = CreateObject("AcroExch.PDDoc")
+    Set TestForm = CreateObject("AFormAut.App")
+    
+    Dim pdfText As AcroAVDoc
+    Set pdfText = adobeApp.GetActiveDoc
+    On Error GoTo NoForm
+    Debug.Print pdfText.FindText("RA-00001-F-00002 / Revision 5", 1, 1, 1)
+
+    Set jso = TestPdf.GetJSObject
+        Debug.Print TestPdf.GetInfo("ETQ$NUMBER")
+        'Debug.Print TestForm.Properties("ETQ$NUMBER")
+    
+    If pdfText.FindText("RA-00001-F-00001", 1, 1, 1) Then ' TestPdf.GetInfo("ETQ$NUMBER") = "RA-00001-F-00001" Then
+        Me.cbJobType = 2
+        Me.cbForm = 1
+        Me.tbVendor = TestForm.Fields("3 Letter Vendor Code").Value
+        
+        If TestForm.Fields("Sold in U.S. Market").Value = "On" Then Me.chk_Ctry_US = True
+        If TestForm.Fields("Sold in Canadian Market").Value = "On" Then Me.chk_Ctry_Canada = True
+        If TestForm.Fields("Sold in CE Market").Value = "On" Then Me.chk_Ctry_EU = True
+        If TestForm.Fields("Sold in Japanese Market").Value = "On" Then Me.chk_Ctry_Japan = True
+        If TestForm.Fields("Sold in Australian Market").Value = "On" Then Me.chk_Ctry_AusNZ = True
+        If TestForm.Fields("Sold in Latin American").Value = "On" Then Me.chk_Ctry_LatinAmerica = True
+        
+        If TestForm.Fields("F3 Attached").Value = "On" Then
+            copyExcel
+         Else
+            AddAdobeMaterial TestForm, "Item Number", "Product Name and Description"
+         End If
+        
+        Me.cbDivision = DLookup("SubID", "qry_RA_DivisionSubSpecialists", "txtDivNumber = '" & TestForm.Fields("Division").Value & "'")
+        Me.lbxMaterials.Requery
+     
+     ElseIf pdfText.FindText("RA-00001-F-00002 / Revision 5", 1, 1, 1) Or _
+        pdfText.FindText("RA-00001-F-00002 / Revision 7", 1, 1, 1) Then 'TestPdf.GetInfo("ETQ$NUMBER") = "RA-00001-F-00002" Then
+        Me.cbJobType = 2
+        Me.cbForm = 2
+        Me.tbVendor = TestForm.Fields("Vendor 3 Letter Code_zcr-gT0b02I1TMsl2VUgyw").Value
+        
+        If TestForm.Fields("Adding Product to a New Market_0_wbC2q1wTSVcWR1ovYM8Kxw").Value = "On" Then Me.chk_Ctry_US = True
+        If TestForm.Fields("Adding Product to a New Market_4_wbC2q1wTSVcWR1ovYM8Kxw").Value = "On" Then Me.chk_Ctry_Canada = True
+        If TestForm.Fields("Adding Product to a New Market_1_wbC2q1wTSVcWR1ovYM8Kxw").Value = "On" Then Me.chk_Ctry_EU = True
+        If TestForm.Fields("Adding Product to a New Market_2_wbC2q1wTSVcWR1ovYM8Kxw").Value = "On" Then Me.chk_Ctry_Japan = True
+        If TestForm.Fields("Adding Product to a New Market_3_wbC2q1wTSVcWR1ovYM8Kxw").Value = "On" Then Me.chk_Ctry_AusNZ = True
+        If TestForm.Fields("Adding Product to a New Market_5_wbC2q1wTSVcWR1ovYM8Kxw").Value = "On" Then Me.chk_Ctry_LatinAmerica = True
+        If TestForm.Fields("cb_F3").Value = "Yes" Then
+            copyExcel
+         Else
+            AddAdobeMaterial TestForm, "Medline Item #", "Job Description"
+         End If
+        Me.lbxMaterials.Requery
+
+        Me.cbDivision = DLookup("SubID", "qry_RA_DivisionSubSpecialists", "txtDivNumber = '" & TestForm.Fields("Division").Value & "'")
+    
+     ElseIf pdfText.FindText("RA-00001-F-00002", 1, 1, 1) Then ' TestPdf.GetInfo("ETQ$NUMBER") = "RA-00001-F-00001" Then
+        Me.cbJobType = 2
+        Me.cbForm = 1
+        Me.tbVendor = TestForm.Fields("Current Vendor 3 Letter Code").Value
+        
+        If TestForm.Fields("U.S").Value = "On" Then Me.chk_Ctry_US = True
+        If TestForm.Fields("Canada").Value = "On" Then Me.chk_Ctry_Canada = True
+        If TestForm.Fields("CE").Value = "On" Then Me.chk_Ctry_EU = True
+        If TestForm.Fields("JPN").Value = "On" Then Me.chk_Ctry_Japan = True
+        If TestForm.Fields("Australia").Value = "On" Then Me.chk_Ctry_AusNZ = True
+        If TestForm.Fields("LatAm").Value = "On" Then Me.chk_Ctry_LatinAmerica = True
+        
+        If TestForm.Fields("If more than one fill out F00003").Value = "On" Then
+            copyExcel
+         Else
+            AddAdobeMaterial TestForm, "Item Number", "b Product Name and Description not name  description SAP"
+         End If
+        Me.lbxMaterials.Requery
+        Me.cbDivision = DLookup("SubID", "qry_RA_DivisionSubSpecialists", "txtDivNumber = '" & TestForm.Fields("Div").Value & "'")
+     ElseIf pdfText.FindText("RA-00001-F-00004", 1, 1, 1) Then ' TestPdf.GetInfo("ETQ$NUMBER") = "RA-00001-F-00004" Then
+        Me.cbJobType = 2
+        Me.cbForm = 3
+        Me.tbVendor = TestForm.Fields("3 Letter Vendor Code").Value
+        
+        If TestForm.Fields("Sold in U.S. Market").Value = "On" Then Me.chk_Ctry_US = True
+        If TestForm.Fields("Sold in Canadian Market").Value = "On" Then Me.chk_Ctry_Canada = True
+        If TestForm.Fields("Sold in CE Market").Value = "On" Then Me.chk_Ctry_EU = True
+        If TestForm.Fields("Sold in Japanese Market").Value = "On" Then Me.chk_Ctry_Japan = True
+        If TestForm.Fields("Sold in Australian Market").Value = "On" Then Me.chk_Ctry_AusNZ = True
+        If TestForm.Fields("Sold in Latin American").Value = "On" Then Me.chk_Ctry_LatinAmerica = True
+        
+        If TestForm.Fields("F3 Attached").Value = "On" Then
+            copyExcel
+         Else
+            AddAdobeMaterial TestForm, "Item Number", "Product Name and Description"
+         End If
+        
+        Me.cbDivision = DLookup("SubID", "qry_RA_DivisionSubSpecialists", "txtDivNumber = '" & TestForm.Fields("Division").Value & "'")
+        Me.lbxMaterials.Requery
+        
+     ElseIf pdfText.FindText("RA-00001-F-00013", 1, 1, 1) Then ' TestPdf.GetInfo("ETQ$NUMBER") = "RA-00001-F-00013" Then
+        Me.cbJobType = 2
+        Me.cbForm = 6
+        Me.tbVendor = TestForm.Fields("g Vendor 3 Letter Code").Value
+        
+        If TestForm.Fields("If more than one fill out F00003").Value = "On" Then
+            copyExcel
+         Else
+            AddAdobeMaterial TestForm, "Item Number", "b Product Name and Description not name  description SAP"
+         End If
+        
+        Me.cbDivision = DLookup("SubID", "qry_RA_DivisionSubSpecialists", "txtDivNumber = '" & TestForm.Fields("Div").Value & "'")
+        Me.lbxMaterials.Requery
+             
+     Else
+        GoTo NoForm
+     End If
+    
+SubExit:
+    Set pdfText = Nothing
+    Set jso = Nothing
+    Set TestPdf = Nothing
+    Set adobeApp = Nothing
+    Exit Sub
+NoForm:
+    MsgBox "Form not recognized.  Verify you have an RA Request Form open and try again.", vbOKOnly, "No RA Form Open"
+    GoTo SubExit
+FormError:
+    MsgBox "Error reading Form.  Verify you have an RA Request Form open and try again.", vbOKOnly, "Error Reading RA Form"
+    GoTo SubExit
+End Sub
+Private Sub cmd_Adobe_Click()
+    AcrobatTest
+    cbDivision_BeforeUpdate False
+    cbDivision_AfterUpdate
+    cbForm_Change
+    DefaultLabeler
+End Sub
+
+Function AddAdobeMaterial(TestForm As Object, MaterialField As String, DescriptionField As String)
+    Dim rstItemList As DAO.Recordset
+    Set rstItemList = CurrentDb.OpenRecordset("lt_SubmitMaterials")
+    rstItemList.Index = "Material"
+
+    With rstItemList
+    If Not IsNull(TestForm.Fields(MaterialField).Value) Then
+        .Seek "=", TestForm.Fields(MaterialField).Value
+        If .NoMatch Then
+            .AddNew
+            !txtMaterial = TestForm.Fields(MaterialField).Value
+            !txtJobName = TestForm.Fields(DescriptionField).Value
+            .Update
+         End If
+     End If
+     End With
+    Set rstItemList = Nothing
+End Function

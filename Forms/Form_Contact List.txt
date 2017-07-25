@@ -1,0 +1,67 @@
+Option Compare Database
+Option Explicit
+
+Private Sub cmdAddFromOutlook_Click()
+    DoCmd.OpenForm "frm_AddFromOutlook", acNormal, , , , acHidden
+    Me.Requery
+End Sub
+
+Private Sub cmdClose_Click()
+    DoCmd.Close acForm, "Contact List"
+    RequeryForm
+End Sub
+
+Private Sub cmdGroups_Click()
+    DoCmd.OpenForm "frm_DivisionGroups", acNormal, , , , acWindowNormal
+End Sub
+
+Private Sub cmdJobList_Click()
+    DoCmd.OpenForm "frmJobList", acNormal, , , , acWindowNormal
+End Sub
+
+Private Sub Form_GotFocus()
+    Dim lngPK As Long 'Primary Key Data Type
+    
+    lngPK = Me.ID 'Current Record
+    Me.Requery
+    
+    With Me.RecordsetClone
+        .FindFirst "ID = " & lngPK
+        If Not .NoMatch Then
+            Me.Bookmark = .Bookmark
+         End If
+     End With
+
+End Sub
+
+Private Sub Form_Load()
+    'DoCmd.MoveSize , , 17280, 13680
+    DoCmd.Maximize
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+    Dim MyUserAuth As Long
+    Dim SeeGroups As Boolean
+    
+    SeeGroups = False
+    
+    MyUserAuth = useLocalVar("lv_iUserAuthLvl")
+    
+    Select Case MyUserAuth
+        Case Is > 2
+            SeeGroups = True
+        Case Is = 2
+            SeeGroups = True
+        Case Is = 1
+     End Select
+     
+     If SeeGroups Then
+        Me.cmdGroups.Visible = True
+        Me.cmdGroups.Enabled = True
+      End If
+
+End Sub
+
+Private Sub showHideColumns_Click()
+    DoCmd.RunCommand acCmdUnhideColumns
+End Sub

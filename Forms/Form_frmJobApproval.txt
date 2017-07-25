@@ -1,0 +1,536 @@
+Option Compare Database
+Option Explicit
+
+Const Row1Top = 1728
+Const Row2Top = 2520
+Const Row3Top = 3312
+Const NewRow = 792
+Const HeaderHgt = 360
+Const Col1Lft = 720
+Const Col2Lft = 3384
+Const Col3Lft = 6048
+
+Dim SendToVT As Boolean
+Dim DeviceClass As String, JobType As String
+Public ObjectID As Long, ObjectText As String
+
+
+Private Sub FormatMe()
+    Dim ctrl As Control
+    
+    For Each ctrl In Me!Jobs_Page.Controls
+            'Adding these phrases to Tags will automatically apply these attributes to the controls
+            ' and will require them to be reversed conditionally as below
+            'Debug.Print ctrl.Name & ": " & ctrl.ControlType
+            'MsgBox ctrl.Name & " | " & ctrl.ControlType & vbNewLine & "Tag: " & ctrl.Tag
+            
+            If ctrl.Tag Like "*LockMe*" Then
+                ctrl.Locked = True
+             End If
+            If ctrl.Tag Like "*HideMe*" Then
+                ctrl.Visible = False
+             End If
+            If ctrl.Tag Like "*Test*" Then
+                If ctrl.Value <> ctrl.OldValue Then
+                    ctrl.Value = ctrl.OldValue
+                 End If
+             End If
+            If ctrl.Tag Like "*Req*" Then
+                ctrl.BorderColor = 0
+                ctrl.BackColor = 16777215
+             End If
+
+         Next
+    
+    SendToVT = True
+    
+    With Me
+        .tbJobName.ForeColor = 5268080
+        .Label_JobName.BackColor = 14937070
+        .cmdSaveClose.Enabled = True
+        .tbNotesRA.BackColor = 13097182
+        .tbNotesRA.BorderColor = 0
+        .tbNotesVT.BackColor = 16777215
+        .chkIncludeInVT.Enabled = True
+        .tbActivityDate.Locked = False
+        .tbActivityDate.Enabled = True
+        .tbActivityDate.Value = Now
+        
+        .tbFinalApproval.Visible = True
+        .tbFinalApproval.Locked = False
+        .tbFinalApproval.Value = Date
+        .tbActivityDate.Value = Now
+        .tbActivityDate.Locked = True
+        .tbActivityDate.Enabled = False
+        
+        If JobType = "Packaging" Then
+            .TabCtl_DataCapt.Visible = True
+            .tbMaterial.Visible = True
+            .tbVendor.Visible = True
+            .tbDeviceClass.Visible = True
+            .cbCE.Visible = True
+            
+            .tbRevCode.Visible = True
+            .tbBrand.Visible = True
+            .txQuantity.Visible = True
+            .cbQtyUOM.Visible = True
+            
+            .cbSterile.Visible = True
+            .cbLatex.Visible = True
+            .cbSingleUse.Visible = True
+            .cbRx.Visible = True
+            .cbMRStatus.Visible = True
+            
+            .cbLotBatch.Visible = True
+            .cbExpiry.Visible = True
+            .cbSerialNumbered.Visible = True
+            .cbManufacturingDate.Visible = True
+            
+            .cbManuStatement1.Visible = True
+            .txManuStatement1.Visible = True
+            
+            
+            Select Case DeviceClass
+                Case "Unclassified (Class 1)", "Class 1", "Class 2", "Class 3"
+                    .cbUDIComplete.Visible = True
+                    .cbUDIComplete.Locked = False
+                    .cbUDIComplete.Enabled = True
+                Case "Not a Device"
+                    .cbUDIComplete = 3
+                Case "Undetermined"
+                    MsgBox "Please confirm Medical Device Class (at the Form/Submission level) before approving labeling/Art.", vbCritical, "Medical Device Status Not Confirmed"
+                    .cmdSaveClose.Enabled = False
+                Case "NA"
+                Case Else
+                    MsgBox "Please confirm Medical Device Class (at the Form/Submission level) before approving labeling/Art.", vbCritical, "Medical Device Status Not Confirmed"
+                    .cmdSaveClose.Enabled = False
+             End Select
+         Else
+            ResizeForm 2
+         End If
+
+    
+        If Not SendToVT Then
+            .tbNotesVT.BackColor = 14937070
+         End If
+    
+    End With
+
+    JobSummaryTest Me
+    
+End Sub
+
+Private Sub cbAddress_AfterUpdate()
+    ChangeTrack Me.cbAddress
+End Sub
+
+Private Sub cbCE_AfterUpdate()
+    ChangeTrack Me.cbCE
+End Sub
+
+Private Sub cbExpiry_AfterUpdate()
+    ChangeTrack Me.cbExpiry
+End Sub
+
+Private Sub cbLatex_AfterUpdate()
+    ChangeTrack Me.cbLatex
+End Sub
+
+Private Sub cbLotBatch_AfterUpdate()
+    ChangeTrack Me.cbLotBatch
+End Sub
+
+Private Sub cbManufacturingDate_AfterUpdate()
+    ChangeTrack Me.cbManufacturingDate
+End Sub
+
+Private Sub cbManuStatement1_AfterUpdate()
+    ChangeTrack Me.cbManuStatement1
+    If Me.txManuStatement1 = "" Or IsNull(Me.txManuStatement1) Then
+        Me.txManuStatement1 = "Medline Industries, Inc."
+        txManuStatement1_AfterUpdate
+     End If
+End Sub
+
+Private Sub cbManuStatement2_AfterUpdate()
+    ChangeTrack Me.cbManuStatement2
+    Select Case Me.cbManuStatement2
+        Case "", IsNull(Me.cbManuStatement2), 1
+            Me.txManuStatement2 = vbNullString
+            Me.txManuStatement2.Enabled = False
+            txManuStatement2_AfterUpdate
+        Case Else
+            Me.txManuStatement2.Enabled = True
+     End Select
+End Sub
+
+Private Sub cbMRStatus_AfterUpdate()
+    ChangeTrack Me.cbMRStatus
+End Sub
+
+Private Sub cbQtyUOM_AfterUpdate()
+    ChangeTrack Me.cbQtyUOM
+    Select Case Me.cbQtyUOM
+        Case "FOZ"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "ML"
+        Case "GL"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "L"
+        Case "QT"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "L"
+        Case "PT"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "L"
+        Case "OZ"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "G"
+        Case "G"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "OZ"
+        Case "KG"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "LB"
+        Case "LB"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "KG"
+        Case "L"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "QT"
+        Case "ML"
+            Me.cbQtyUOM2.Visible = True
+            Me.txQuantity2.Visible = True
+            Me.cbQtyUOM2 = "FOZ"
+        Case Else
+            Me.cbQtyUOM2.Visible = False
+            Me.txQuantity2.Visible = False
+            Me.cbQtyUOM2.Value = vbNullString
+            Me.txQuantity2.Value = vbNullString
+
+     End Select
+     ChangeTrack Me.cbQtyUOM2
+     
+End Sub
+
+Private Sub cbQtyUOM2_AfterUpdate()
+    ChangeTrack Me.cbQtyUOM2
+End Sub
+
+Private Sub cbRx_AfterUpdate()
+    ChangeTrack Me.cbRx
+End Sub
+
+Private Sub cbSerialNumbered_AfterUpdate()
+    ChangeTrack Me.cbSerialNumbered
+End Sub
+
+Private Sub cbSingleUse_AfterUpdate()
+    ChangeTrack Me.cbSingleUse
+End Sub
+
+Private Sub cbSterile_AfterUpdate()
+    ChangeTrack Me.cbSterile
+End Sub
+
+Private Sub cbUDIComplete_AfterUpdate()
+    ChangeTrack Me.cbUDIComplete
+    JobSummaryTest Me
+End Sub
+
+Private Sub chkIncludeInVT_Click()
+    If SendToVT = False And Me.chkIncludeInVT Then SendToVT = True
+    JobSummaryTest Me
+End Sub
+
+Private Sub cmdCancel_Click()
+    Form_Close
+End Sub
+
+Private Sub Form_Close()
+    CancelAndCloseForm Me
+End Sub
+
+Private Sub Form_Load()
+    
+'    ResizeForm 1
+    Dim args
+    args = Split(Me.OpenArgs, "|")
+    DeviceClass = args(0)
+    JobType = args(2)
+
+    ObjectID = Me.anAutoNumber
+    If Not IsNull(Me.txtJobNumber) Then ObjectText = Me.txtJobNumber
+    Me.tbDeviceClass = DLookup("MedDeviceClass", "qryJobs", "anAutoNumber = " & Me.anAutoNumber)
+    Me.tbVendor = DLookup("txtVendor", "qryJobs", "anAutoNumber = " & Me.anAutoNumber)
+    BeginChangeTrack Me, 2
+    FormatMe
+    JobSummaryTest Me
+    
+End Sub
+
+Private Sub cmdSaveClose_Click()
+    
+    Dim i As Integer
+    For i = 0 To Me.Controls.Count - 1
+        ChangeTrack Me.Controls(i)
+     Next i
+'    Dim strTypeErrors As String
+'    strTypeErrors = JobActivityValidation(Me)
+    Dim Valid As Boolean, JobID As Long
+'    Valid = ActivityValidate(Me, strTypeErrors)
+    Valid = ActivityValidate(Me)
+    If Valid Then
+        JobID = Me.anAutoNumber
+        JobApproval Me, SendToVT
+        SaveAndCloseForm Me
+        UpdateListTextFields 3, JobID
+     End If
+
+End Sub
+
+Private Function ResizeForm(MyRows As Long)
+    Dim Movement As Long
+    Select Case MyRows
+        Case 1
+            Movement = Row2Top
+        Case 2
+            Movement = Row3Top
+        Case 3
+            Movement = Row3Top + NewRow
+     End Select
+     
+    With Me
+        .tbNotesVT.Top = (Movement - 252)
+        .Jobs_Page.Height = .tbNotesVT.Top + 2820 '4495
+        .tabActivity.Height = .Jobs_Page.Height + 145 '4645
+        .Detail.Height = .tabActivity.Height + 333 '4960
+        .InsideHeight = .Detail.Height + .FormHeader.Height + 415 '6510
+    End With
+End Function
+
+Private Sub tbBrand_AfterUpdate()
+    ChangeTrack Me.tbBrand
+End Sub
+
+Private Sub tbFinalApproval_AfterUpdate()
+
+    Me.tbActivityDate = Me.tbFinalApproval
+    ChangeTrack Me.tbFinalApproval
+End Sub
+
+Private Sub tbNotesRA_AfterUpdate()
+    If Me.tbNotesRA = "" Or IsNull(Me.tbNotesRA) Then
+        Me.chkIncludeInVT.Enabled = False
+        Me.chkIncludeInVT = Null
+     End If
+    JobSummaryTest Me
+End Sub
+
+Private Sub tbNotesRA_Change()
+    Me.chkIncludeInVT.Enabled = True
+    Me.chkIncludeInVT = True
+End Sub
+
+Sub JobApproval(ByRef JobForm As Form, SendToVT As Boolean)
+    Dim strNoteBy As String, strSummary As String, lngUserID As Long
+    Dim strActivityID As String, dtTimeStamp As Date, dtActivity As Date, ctrl As Control
+    
+    On Error GoTo MyError
+    
+    Dim wrkSpace As DAO.Workspace
+    Set wrkSpace = DBEngine(0)
+
+    Dim strValidity As String
+    If JobForm.cbUDIComplete.Visible = True And (IsNull(JobForm.cbUDIComplete) Or JobForm.cbUDIComplete > 2) Then
+        strValidity = "To approve packaging jobs, you must indicate if Labeling is UDI compliant."
+     End If
+    
+    If strValidity = "" Then
+        
+        strNoteBy = useLocalVar("lv_sUserName")
+        lngUserID = useLocalVar("lv_iContactID")
+        dtTimeStamp = Now
+        dtActivity = JobForm.tbActivityDate
+        strActivityID = Format(lngUserID, "000") & "." & Format(dtTimeStamp, "YYYYMMDDhhmmss")
+
+        If Format(dtTimeStamp, "m/d/yyyy") <> Format(dtActivity, "m/d/yyyy") Then
+            dtActivity = Format(dtActivity, "m/d/yyyy")
+         End If
+        If Format(dtTimeStamp, "m/d/yyyy") <> Format(JobForm.tbFinalApproval, "m/d/yyyy") And JobForm.tbFinalApproval.Visible = True Then
+            JobForm.tbFinalApproval = Format(JobForm.tbFinalApproval, "m/d/yyyy")
+            ChangeTrack JobForm.tbFinalApproval
+         End If
+        If JobForm.tbNotesVT = "" Or IsNull(JobForm.tbNotesVT) Then
+            strSummary = JobSummaryTest(JobForm)
+         Else
+            strSummary = JobForm.tbNotesVT
+         End If
+        Debug.Print strSummary
+        
+        
+        ActiveTransaction = True
+        wrkSpace.BeginTrans
+        
+        If strSummary <> "" Then
+            Dim sqlLogAdd As String
+            sqlLogAdd = "INSERT INTO Log_Activity ( fkJobID, txtActivity, txtActivityID, " & _
+                        "dtActivityStamp, fkUserID, UserName, txtSummary, TransferVT, " & _
+                        "txtJobNumber, dtRecorded ) " & _
+                        " SELECT '" & JobForm.anAutoNumber & "', 'Approve', '" & strActivityID & _
+                        "', '" & dtActivity & _
+                        "', '" & lngUserID & "', '" & strNoteBy & "', " & Chr(34) & strSummary & Chr(34) & _
+                        ", " & SendToVT & ", '" & JobForm.txtJobNumber & "', '" & dtTimeStamp & "' ;"
+
+            Debug.Print sqlLogAdd
+            
+            CurrentDb.Execute sqlLogAdd, dbFailOnError
+         End If
+
+'>>>>>>>>>>>>>>>>>>>
+        Dim sqlFindID As String, rstFindID As DAO.Recordset
+        sqlFindID = "SELECT ID FROM Log_Activity WHERE txtActivityID = " & Chr(34) & strActivityID & Chr(34)
+        Set rstFindID = CurrentDb.OpenRecordset(sqlFindID)
+        
+        Dim fkActivityID As Long
+        fkActivityID = rstFindID.Fields("ID")
+        Set rstFindID = Nothing
+
+        sqlLogAdd = "INSERT INTO Log_Changes ( fkActivityID, txtActivityID, fkObjectType, " & _
+                    "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                    "OldValue, txtOldDisplay ) " & _
+                    "SELECT " & fkActivityID & ", " & Chr(34) & strActivityID & Chr(34) & ", fkObjectType, " & _
+                    "fkObjectID, txtObjectID, txtFieldName, NewValue, txtNewDisplay, " & _
+                    "OldValue, txtOldDisplay " & _
+                    "FROM lt_Changes " & _
+                    "WHERE lt_Changes.bRecordChange = True"
+        
+        CurrentDb.Execute sqlLogAdd, dbFailOnError
+
+'<<<<<<<<<<<<<<<<<<
+        'If Notes are populated, records them in Log_RaJobNotes
+        If Not IsNull(JobForm.tbNotesRA) Then
+
+            Dim sqlNotes As String
+            sqlNotes = "INSERT INTO [Log_RaJobNotes] ( fkJobID, dtJobNote, txtNote, txtNoteBy, dtRecorded, fkActivityID) " & _
+                            "SELECT '" & JobForm.anAutoNumber & "', '" & dtActivity & "', " & Chr(34) & _
+                            JobForm.tbNotesRA & Chr(34) & ", '" & strNoteBy & "', '" & dtTimeStamp & "' , " & CStr(fkActivityID) & "; "
+            
+            CurrentDb.Execute sqlNotes, dbFailOnError
+         End If
+        
+        JobForm.dtLastUpdate = dtTimeStamp
+        JobForm!fkStatusRA = 4  'RA Status is approved
+        wrkSpace.CommitTrans
+        ActiveTransaction = False
+        RecordArtworkData dtTimeStamp
+        UpdateJobDU JobForm.anAutoNumber, fkActivityID
+        DTU_NotesUpdate (JobForm.anAutoNumber)
+        'UpdateJobJL JobForm.anAutoNumber, fkActivityID
+     Else
+        MsgBox "Unable to record activity: " & vbNewLine & vbNewLine & strValidity, , "Error"
+     End If
+
+ImFinished:
+    EndChangeTrack
+    wrkSpace.Close
+    Set wrkSpace = Nothing
+    Exit Sub
+MyError:
+    MsgBox "Failed to record Job Activity." & vbNewLine & _
+        "Error: " & Err.Number & vbNewLine & "Descrp: " & Err.Description & vbNewLine & _
+        strValidity, vbCritical, "ERROR"
+    
+    If ActiveTransaction Then
+        wrkSpace.Rollback
+     End If
+    
+    Resume ImFinished
+End Sub
+
+Private Sub tbRevCode_AfterUpdate()
+    ChangeTrack Me.tbRevCode
+End Sub
+
+Private Sub txManuStatement1_AfterUpdate()
+    ChangeTrack Me.txManuStatement1
+End Sub
+
+Private Sub txManuStatement2_AfterUpdate()
+    ChangeTrack Me.txManuStatement2
+End Sub
+
+Private Sub txQuantity_AfterUpdate()
+    ChangeTrack Me.txQuantity
+End Sub
+
+Private Function RecordArtworkData(dtRecorded As Date)
+    Dim sqlArtworkData As String, rstArtworkData As DAO.Recordset
+    
+    If JobType = "Packaging" Then
+        sqlArtworkData = "SELECT * FROM tblLabelData"
+        Set rstArtworkData = CurrentDb.OpenRecordset(sqlArtworkData)
+        
+        With rstArtworkData
+            .AddNew
+                !fkJobID = anAutoNumber
+                !txtMaterialNum = Me.txtMaterialNum
+                !txtVendor = Me.tbVendor
+                !txAddress = Me.cbAddress
+                !txBrand = Me.tbBrand
+                !txRevCode = Me.tbRevCode
+                !txQuantity = Me.txQuantity
+                !txQuantityUOM = Me.cbQtyUOM
+                If Not IsNull(Me.txQuantity2) And Not Me.txQuantity2 = "" Then
+                    !txQuantity2 = Me.txQuantity2
+                    !txQuantity2UOM = Me.cbQtyUOM2
+                 End If
+                !fkCEMark = Me.cbCE
+                !fkSterileStatement = Me.cbSterile
+                !fkLatexStatement = Me.cbLatex
+                !fkSingleUse = Me.cbSingleUse
+                !fkMRIStatement = Me.cbMRStatus
+                !fkRxStatement = Me.cbRx
+                !fkLotBatch = Me.cbLotBatch
+                !fkSerialNumber = Me.cbSerialNumbered
+                !fkManufactureDate = Me.cbManufacturingDate
+                !fkExpiryDate = Me.cbExpiry
+                !tbManufactureStatement1 = Me.cbManuStatement1
+                !tbManufacturer1 = Me.txManuStatement1
+                !tbManufactureStatement2 = Me.cbManuStatement2
+                If Not IsNull(Me.txManuStatement2) Then
+                    !tbManufacturer2 = Me.txManuStatement2
+                 End If
+                !dtRecorded = dtRecorded
+            .Update
+         End With
+    
+    ElseIf JobType = "Ad/Prom" Then
+        sqlArtworkData = "SELECT * FROM tblAdpromData"
+        Set rstArtworkData = CurrentDb.OpenRecordset(sqlArtworkData)
+        
+        With rstArtworkData
+            .AddNew
+                !fkJobID = anAutoNumber
+                !txAddress = Me.cbAddress
+                !dtRecorded = dtRecorded
+            .Update
+         End With
+
+     End If
+    
+    Set rstArtworkData = Nothing
+End Function
+
+Private Sub txQuantity2_AfterUpdate()
+    ChangeTrack Me.txQuantity2
+End Sub

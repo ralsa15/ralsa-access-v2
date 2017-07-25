@@ -1,0 +1,106 @@
+Option Compare Database
+Option Explicit
+
+Private Sub ApplySavedFilter_Click()
+    OpenFilterFavorites Me
+End Sub
+
+Private Sub cbAssignedTo_DblClick(Cancel As Integer)
+    DoCmd.OpenForm "Contact Details", acNormal, , "[Contact Name] = '" & cbAssignedTo & "'", acFormReadOnly
+End Sub
+
+Private Sub cbDivReviewer_DblClick(Cancel As Integer)
+    DoCmd.OpenForm "Contact Details", acNormal, , "[Contact Name] = '" & cbDivReviewer & "'", acFormReadOnly
+End Sub
+
+Private Sub cboFilterFavorites_AfterUpdate()
+    Filters_ApplyFilterFavorite Me.ActiveControl
+    'Me.SearchClear.Visible = True
+End Sub
+
+Private Sub cboFilterFavorites_GotFocus()
+    Me.cboFilterFavorites.Requery
+End Sub
+
+Private Sub chkApproved_AfterUpdate()
+    ChangeRecordSource Me
+End Sub
+
+Private Sub chkRejected_AfterUpdate()
+    ChangeRecordSource Me
+End Sub
+
+Private Sub cmdClose_Click()
+    DoCmd.Close acForm, "frmSubmissionList"
+    RequeryForm
+End Sub
+
+Private Sub cmdContactList_Click()
+    DoCmd.OpenForm "Contact List", acNormal, , , , acWindowNormal
+End Sub
+
+Private Sub cmdNewSub_Click()
+    DoCmd.OpenForm "frmNewSubmission", acNormal, , , , acWindowNormal, 2
+End Sub
+
+Private Sub Form_Current()
+    If Me.Filter <> "" Then
+        Me.SearchClear.Visible = True
+     Else
+        Me.SearchClear.Visible = False
+     End If
+End Sub
+
+Private Sub Form_GotFocus()
+    Dim lngPK As Long 'Primary Key Data Type
+    
+    lngPK = Me.anSubmissionID 'Current Record
+    Me.Requery
+    
+    With Me.RecordsetClone
+        .FindFirst "anSubmissionID = " & lngPK
+        If Not .NoMatch Then
+            Me.Bookmark = .Bookmark
+         End If
+     End With
+
+End Sub
+
+Private Sub Form_Load()
+    'DoCmd.MoveSize , , 17280, 10680
+    DoCmd.Maximize
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+    Dim UserID As String, RecSource As String
+    UserID = useLocalVar("lv_sUserName")
+    RecSource = Me.RecordSource
+    
+    Dim DefaultFilterID As Long, FilterString As String
+    DefaultFilterID = DLookup("[intDefaultFilter]", "[lt_FormSettings]", "[txtFormName] = '" & Me.Name & "'")
+    FilterString = DLookup("[FilterString]", "lt_Filters", "ID = " & DefaultFilterID)
+    Me.Filter = MyFilter(Me, FilterString)
+    Me.FilterOn = True
+End Sub
+
+Private Sub SearchClear_Click()
+    ClearFilter Me
+    Me.Filter = vbNullString
+End Sub
+
+Private Sub showHideColumns_Click()
+    DoCmd.RunCommand acCmdUnhideColumns
+End Sub
+
+Private Sub tbInitiator_DblClick(Cancel As Integer)
+    DoCmd.OpenForm "Contact Details", acNormal, , "[Contact Name] = '" & tbInitiator & "'", acFormReadOnly
+End Sub
+
+Private Sub tbQA_Approval_DblClick(Cancel As Integer)
+    DoCmd.OpenForm "Contact Details", acNormal, , "[Contact Name] = '" & tbQA_Approval & "'", acFormReadOnly
+End Sub
+
+Private Sub tbSubmissionID_Click()
+    DoCmd.OpenForm "frmSubmissionDetails", acNormal, , "[stSubmissionEntry] = '" & tbSubmissionID & "'", acFormEdit, acWindowNormal
+    'Me.Requery
+End Sub

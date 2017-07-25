@@ -1,0 +1,198 @@
+Option Compare Database
+Option Explicit
+
+Private Sub cbActivities_AfterUpdate()
+    '>> Based on users selection from dropdown options, opens the appropriate form and sends arguments to determine its 'Activity' field
+    
+    Select Case Me.cbActivities
+        Case 1, 2, 5 'Received, Add Notes, Cancel
+            DoCmd.OpenForm "frmSubmissionActivity", acNormal, , "[anSubmissionID] = " & anSubmissionID & "", acFormEdit, acDialog, Me.cbActivities.Value
+        Case 6 'Reassign
+            DoCmd.OpenForm "frmSubmissionReassign", acNormal, , "[anSubmissionID] = " & anSubmissionID & "", acFormEdit, acDialog, 6
+        Case 8 'Update Details
+            DoCmd.OpenForm "frmSubmission_Update", acNormal, , "[anSubmissionID] = " & anSubmissionID & "", acFormEdit, acDialog, 0
+     End Select
+    
+    '>> Code does not proceed until after Dialog form is closed
+    Me.hlk_RecordActivity.SetFocus
+    Me.cbActivities.Visible = False
+    Me.Requery
+    Me.lsbHistory.Requery
+    Me.lsbSubNotes.Requery
+End Sub
+
+Private Sub cbRaLabeler_Click()
+    '>> Clicking on the RA Labeler field opens the form to reassign the submission; Tooltip indicates the option
+    
+    DoCmd.OpenForm "frmSubmissionReassign", acNormal, , "[anSubmissionID] = " & anSubmissionID & "", acFormEdit, acDialog, 6
+    
+    '>> Code does not proceed until after Dialog form is closed
+    Me.Requery
+    Me.lsbHistory.Requery
+    Me.lsbSubNotes.Requery
+End Sub
+
+Private Sub cmdClose_Click()
+    '>> Closes itself and requeries other open forms
+    DoCmd.Close acForm, "frmSubmissionDetails"
+    RequeryForm
+End Sub
+
+Private Sub cmdNew_Click()
+    '>> Closes itself and requeries other open forms, then opens the form to enter a new submission
+    DoCmd.Close acForm, "frmSubmissionDetails"
+    RequeryForm
+    DoCmd.OpenForm "frmNewSubmission"
+End Sub
+
+Private Sub Form_Current()
+    '>> Hides button to Approve if Submission is already approved
+    If Me.tbFormStatus = "Approved" Then Me.hlk_Approve.Visible = False
+End Sub
+
+Private Sub Form_GotFocus()
+    Me.Refresh
+End Sub
+
+Private Sub Form_Load()
+    Dim Switch As String
+        
+    With Me
+    
+    '>> Confirms the request type to determine how form should be formatted
+    If IsNull(.cbJobType) Or .cbJobType = "" Then
+     Else
+        Switch = .cbJobType
+     End If
+
+    '>> Determines which controls should be hidden based on request type
+    '   ControlTypes: 100 = Label | 109 = TextBox | 110 = ListBox
+    Dim ctrl As Variant
+    For Each ctrl In .Controls
+        If (ctrl.ControlType = 109 Or ctrl.ControlType = 110 Or ctrl.ControlType = 100) Then
+            If ctrl.Tag Like Switch Then
+                Debug.Print ctrl.Name & ": " & ctrl.Tag & "|" & ctrl.ControlType
+                ctrl.Visible = False
+             End If
+         End If
+     Next ctrl
+    If .FlaggedHot > 1 Then Me.Label_Hot.Visible = True
+    
+    '>> Based on Labeling Form Type, determines if Languages is a relevent field for display
+    Select Case .fkForm
+        Case "F1", "F4"
+            .fkLanguages.Enabled = True
+            .fkLanguages.Visible = True
+        Case "F2", "F13"
+            .fkLanguages.Enabled = False
+            .fkLanguages.Visible = False
+            .Label_Languages.Visible = False
+        Case "F6"
+        Case Else   'Ad-Prom/Collateral
+            .fkLanguages.Enabled = True
+            .fkLanguages.Visible = True
+     End Select
+
+    '>> Adjusts visible fields and layout based on request type
+    If Switch = "Ad/Prom" Then
+         .fkLanguages.Enabled = False
+         .fkLanguages.Visible = False
+         .tbUDI.Visible = False
+         .Label_UDI.Visible = False
+         .tbVendor.Visible = False
+         .tbQA_Approval.Visible = False
+         .fkForm.Visible = False
+         .tbMedDeviceClass.Visible = False
+         .Label_MedDeviceClass.Visible = False
+         .tbFormStatus.Visible = False
+         .hlk_Approve.Visible = False
+         .hlk_RecordActivity.Visible = False
+         
+         .Label_Associated_Jobs.Top = 2560
+         .lsbJobs.Top = 2860
+         .lsbJobs.Height = 1440
+         .Label_History.Top = 4500
+         .lsbHistory.Top = 4800
+         .lsbSubNotes.Top = 6720
+         .tabTasks.Height = 6990
+         .Detail.Height = 8820
+         .InsideHeight = 10100
+         .Auto_Title0.Width = 3960
+         .Auto_Title0.Caption = "Divisional Collateral Jobs"
+        Else 'Labeling
+         '.tbDivision.Top = 1800
+         '.lsbJobs.Top = 3960
+         '.lsbJobs.Height = 3600
+         '.Auto_Title0.Width = 3240
+         '.Auto_Title0.Caption = "Submission Details"
+         If .tbUDI = "" Or IsNull(.tbUDI) Then
+            Else
+            .tbUDI.Visible = True
+            .Label_UDI.Visible = True
+          End If
+     End If
+    
+    End With
+    
+    '>> Populates lists (Jobs, Activity History, RA Notes)
+    Dim iRec As Integer
+    iRec = Me.anSubmissionID
+    Me.lsbJobs.RowSource = "SELECT [qryJobs].[anAutoNumber], [qryJobs].[Job] AS [Job], [qryJobs].[Item], [qryJobs].[txtJobName], [qryJobs].[ReviewerName] AS [Reviewer Name], [qryJobs].[LabelerName] AS [Labeler Name], [qryJobs].[dtFinalApproval], [qryJobs].[JobStatus] AS [VT Job Status], [qryJobs].[AM Status] AS [AM Status] FROM qryJobs WHERE [qryJobs].[fkSubmissionID] = " & iRec & " ORDER BY [anAutoNumber],[Job] ; "
+    Me.Label_Associated_Jobs.Caption = "Associated Jobs (" & CStr(Me.lsbJobs.ListCount - 1) & ")"
+    Me.lsbHistory.RowSource = "SELECT Log_Activity.ID, Format(Log_Activity.dtActivityStamp,'m/d/yyyy') AS [Date], Log_Activity.txtSummary, Log_Activity.UserName AS [User] FROM Log_Activity WHERE [Log_Activity].[fkSubID] = " & iRec & " ORDER BY [dtActivityStamp] Desc, [ID] Desc; "
+    Me.lsbSubNotes.RowSource = "SELECT Log_RaSubNotes.anSubNoteID, Log_RaSubNotes.fkSubID, Format(Log_RaSubNotes.dtSubNote,'m/d/yyyy') AS [Date], Log_RaSubNotes.txtNote, (Log_RaSubNotes.txtNoteBy) AS [User] FROM Log_RaSubNotes WHERE [Log_RaSubNotes].[fkSubID] = " & iRec & " ORDER BY Log_RaSubNotes.dtSubNote DESC; "
+
+End Sub
+
+Private Sub hlk_Approve_Click()
+    '>> Opens form to Record Approval of Submission
+    DoCmd.OpenForm "frmSubmissionActivity", acNormal, , "[anSubmissionID] = " & anSubmissionID & "", acFormEdit, acDialog, 3
+    
+    '>> Code does not proceed until after Dialog form is closed
+    Me.Requery
+    Me.lsbHistory.Requery
+    Me.lsbSubNotes.Requery
+End Sub
+
+Private Sub hlk_Approve_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    fLabelMouseDown "hlk_Approve"
+End Sub
+
+Private Sub hlk_Approve_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "hlk_Approve", Me, 16777214 '15921906
+End Sub
+
+Private Sub hlk_RecordActivity_Click()
+    With Me.cbActivities
+        .Visible = True
+        .SetFocus
+        .Dropdown
+     End With
+End Sub
+
+'Private Sub hlk_RecordActivity_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
+'    fLabelMouseDown "hlk_RecordActivity"
+'End Sub
+'
+'Private Sub hlk_RecordActivity_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+'    Highlight "hlk_RecordActivity", Me, 16777214 '15921906
+'End Sub
+
+Private Sub hlk_Reject_Click()
+    DoCmd.OpenForm "frmSubmissionActivity", acNormal, , "[anSubmissionID] = " & anSubmissionID & "", acFormEdit, acDialog, 4
+    Me.Requery
+    Me.lsbHistory.Requery
+    Me.lsbSubNotes.Requery
+End Sub
+
+Private Sub Jobs_Page_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    ClearAll True, Me
+End Sub
+
+Private Sub lsbHistory_DblClick(Cancel As Integer)
+    If lsbHistory <> "" Then DoCmd.OpenForm "frmChangeDetails", acNormal, , "[ID] = " & lsbHistory & "", acFormReadOnly, acNormal, "Sub|" & Me.stSubmissionEntry
+End Sub
+
+Private Sub lsbJobs_DblClick(Cancel As Integer)
+    If lsbJobs <> "" Then DoCmd.OpenForm "frmJobDetails", acNormal, , "[anAutoNumber] = " & lsbJobs & "", acFormEdit, acDialog
+End Sub

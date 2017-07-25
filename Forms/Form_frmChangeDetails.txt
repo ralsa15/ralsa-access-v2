@@ -1,0 +1,91 @@
+Option Compare Database
+
+Private Sub cmdDone_Click()
+    DoCmd.Close acForm, Me.Name
+End Sub
+
+Private Sub Form_Current()
+    'Me.List_JobChanges.RowSource = "SELECT [Log_JobActivityDetails].[ID], [Log_JobActivityDetails].[fkActivityID], " & _
+                        "[Log_JobActivityDetails].[txtFieldName], [Log_JobActivityDetails].[txtNewValue], " & _
+                        "[Log_JobActivityDetails].[txtOldValue] " & _
+                        "FROM [Log_JobActivityDetails] " & _
+                        "WHERE [Log_JobActivityDetails].[fkActivityID] = '" & Me.txtActivityID & "' ORDER BY [ID];"
+    
+    'Me.List_SubChanges.RowSource = "SELECT [Log_ActivitySubDetails].[ID], [Log_ActivitySubDetails].[fkActivityID], " & _
+                        "[Log_ActivitySubDetails].[txtFieldName], [Log_ActivitySubDetails].[txtNewValue], " & _
+                        "[Log_ActivitySubDetails].[txtOldValue] " & _
+                        "FROM [Log_ActivitySubDetails] " & _
+                        "WHERE [Log_ActivitySubDetails].[fkActivityID] = '" & Me.txtActivityID & "' ORDER BY [ID];"
+    'Active:Me.List_SubChanges.RowSource = "SELECT Log_Changes.txtFieldName, Log_Changes.txtNewDisplay, Log_Changes.txtOldDisplay " & _
+                        "FROM Log_Changes " & _
+                        "WHERE fkActivityID = " & Me.ID
+
+    'Me.List_JobChanges.RowSource = "SELECT [Log_JobActivityDetails].[ID], [tblJobLog].[txtJobNumber], [Log_JobActivityDetails].[fkActivityID], " & _
+                        "[Log_JobActivityDetails].[txtFieldName], [Log_JobActivityDetails].[txtNewValue], " & _
+                        "[Log_JobActivityDetails].[txtOldValue] " & _
+                        "FROM ([Log_Activity] LEFT JOIN [Log_JobActivityDetails] ON [Log_Activity].[txtActivityID] = [Log_JobActivityDetails].[fkActivityID]) " & _
+                        "LEFT JOIN [tblJobLog] ON [Log_Activity].[fkJobID] = [tblJobLog].[anAutoNumber] " & _
+                        "WHERE [Log_JobActivityDetails].[fkActivityID] = '" & Me.txtActivityID & "' ORDER BY [Log_JobActivityDetails].[ID];"
+    '**Me.List_JobChanges.RowSource = "SELECT [Log_JobActivityDetails].[ID], [tblJobLog].[txtJobNumber], [Log_JobActivityDetails].[fkActivityID], " & _
+                        "[Log_JobActivityDetails].[txtFieldName], [Log_JobActivityDetails].[txtNewValue], " & _
+                        "[Log_JobActivityDetails].[txtOldValue] " & _
+                        "FROM ([Log_Activity] LEFT JOIN [Log_JobActivityDetails] ON [Log_Activity].[txtActivityID] = [Log_JobActivityDetails].[fkActivityID]) " & _
+                        "LEFT JOIN [tblJobLog] ON [Log_JobActivityDetails].[fkJobID] = [tblJobLog].[anAutoNumber] " & _
+                        "WHERE [Log_JobActivityDetails].[fkActivityID] = '" & Me.txtActivityID & "' ORDER BY [Log_JobActivityDetails].[ID];"
+    'The following should be replaced - it games the system rather than connecting specific Jobs to activity
+    'Me.List_JobChanges.RowSource = "SELECT DISTINCT Log_JobActivityDetails.fkActivityID, tblJobLog.txtJobNumber, " & _
+                        "Log_JobActivityDetails.txtFieldName, Log_JobActivityDetails.txtNewValue, " & _
+                        "Log_JobActivityDetails.txtOldValue " & _
+                        "FROM (Log_Activity INNER JOIN Log_JobActivityDetails ON Log_Activity.[txtActivityID] = Log_JobActivityDetails.[fkActivityID]) " & _
+                        "LEFT JOIN tblJobLog ON Log_Activity.fkSubID = tblJobLog.fkSubmissionID " & _
+                        "WHERE (((Log_Activity.txtActivityID) = '" & Me.txtActivityID & "')) " & _
+                        "ORDER BY tblJobLog.txtJobNumber;"
+                        
+    Me.List_SubChanges.RowSource = "SELECT Log_Changes.txtFieldName, Log_Changes.txtNewDisplay, Log_Changes.txtOldDisplay " & _
+                        "FROM Log_Changes " & _
+                        "WHERE fkActivityID = " & Me.ID & " AND fkObjectType = 1"
+    Me.List_JobChanges.RowSource = "SELECT Log_Changes.txtObjectID As [Job], Log_Changes.txtFieldName, Log_Changes.txtNewDisplay, Log_Changes.txtOldDisplay " & _
+                        "FROM Log_Changes " & _
+                        "WHERE fkActivityID = " & Me.ID & " AND fkObjectType = 2"
+    
+    If Me.txtNewStatus <> "" And Not IsNull(Me.txtNewStatus) Then
+        Me.txtNewStatus.Visible = True
+     End If
+    If Me.txtReason <> "" And Not IsNull(Me.txtReason) Then
+        Me.txtReason.Visible = True
+     End If
+    If Me.List_SubChanges.ListCount = 0 Then
+        Me.List_SubChanges.Height = 0
+        Me.List_SubChanges.Visible = False
+        Me.Detail.Height = Me.Detail.Height - (1620 + 315) ' Me.List_SubChanges.Height - Me.Label_SubChangeDetails.Height
+        Me.InsideHeight = Me.Detail.Height + Me.Label_SubChangeDetails.Height
+     End If
+    If Me.List_JobChanges.ListCount > 0 Then
+        Me.FormFooter.Visible = True
+        Me.InsideHeight = Me.InsideHeight + Me.FormFooter.Height
+     End If
+    Debug.Print Me.List_JobChanges.RowSource
+
+End Sub
+
+Private Sub Form_Load()
+'    Dim FormArgs
+'    FormArgs = Split(Forms!frmChangeDetails.OpenArgs, "|")
+'    Select Case FormArgs(0)
+'        Case "Sub"
+'            Me.Auto_Header0.Caption = "Activity/Change - Submission: " & FormArgs(1)
+'            Me.Label2.Caption = "New Form Status"
+'        Case "Job"
+'            Me.Auto_Header0.Caption = "Activity/Change - Job: " & FormArgs(1)
+'            Me.Label2.Caption = "New Job Status"
+'     End Select
+    If Not IsNull(Me.txtSubmissionID) Then
+        Me.Auto_Header0.Caption = "Submission: " & txtSubmissionID
+        Me.Label2.Caption = "New Form Status"
+    ElseIf Not IsNull(Me.txtJobNumber) Then
+        Me.Auto_Header0.Caption = "Job: " & txtJobNumber
+        Me.Label2.Caption = "New Job Status"
+     End If
+    
+    'Forms!frmChangeDetails.OpenArgs
+End Sub

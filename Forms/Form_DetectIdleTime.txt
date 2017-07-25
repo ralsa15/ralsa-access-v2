@@ -1,0 +1,28 @@
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Load()
+    storLocalVars "Login"
+    UserStatus "", "", 0, "Login"
+    DoCmd.OpenForm "frmMessages", acNormal, , , , acHidden
+    DoCmd.OpenForm "frmFormsMenu", acNormal, , , , acWindowNormal
+
+    TimeToClose = 100
+End Sub
+
+Private Sub Form_Close()
+    UserStatus "", "", 0, "Logout"
+End Sub
+
+Private Sub Form_Timer()
+
+    If TimeToClose <= 10 Then
+        Forms!DetectIdleTime.Controls("lblCount").Caption = "Exiting in ... " & TimeToClose
+        If TimeToClose < 1 Then
+            DoCmd.Close acForm, "DetectIdleTime"
+            Application.Quit acQuitSaveNone
+         End If
+        TimeToClose = TimeToClose - 1
+     End If
+
+End Sub

@@ -1,0 +1,101 @@
+Option Compare Database
+
+Private Sub Label_Add_Click()
+    With Me
+    
+    Select Case .Label_Add.Caption
+        Case "Add New"
+            .Properties("AllowAdditions") = True
+            If CurrentProject.AllForms("Contact Details").IsLoaded Then
+                Forms![Contact Details].cmdClose.Enabled = False
+                Forms![Contact Details].cmdSaveAndNew.Enabled = False
+                Forms![Contact Details].cmdEmail.Enabled = False
+                Forms![Contact Details].cmdSaveAsOutlookContact.Enabled = False
+             End If
+            .Label_Add.Caption = "Done Editing"
+            DoCmd.GoToRecord , , acNewRec
+            .txtDivNumber.SetFocus
+        Case "Done Editing"
+            If Me.txtDivNumber = "" Or IsNull(Me.txtDivNumber) Then Me.Undo
+            .Properties("AllowAdditions") = False
+            If CurrentProject.AllForms("Contact Details").IsLoaded Then
+                Forms![Contact Details].cmdClose.Enabled = True
+                Forms![Contact Details].cmdSaveAndNew.Enabled = True
+                Forms![Contact Details].cmdEmail.Enabled = True
+                Forms![Contact Details].cmdSaveAsOutlookContact.Enabled = True
+             End If
+            .Label_Add.Caption = "Add New"
+    End Select
+
+    End With
+End Sub
+
+Private Sub Label_Remove_Click()
+    '4/4/2016 - Not in Use; Form uses cmdDelete, which uses a Macro rather than VBA
+    DoCmd.SetWarnings False
+    DoCmd.RunCommand acCmdDeleteRecord '4/4/2106 - Originally the only line
+    DoCmd.SetWarnings True
+
+    On Error GoTo Err_Handler
+
+    With Me
+        If Not .NewRecord Then
+            DoCmd.RunCommand acCmdDeleteRecord
+         End If
+        If .NewRecord And Not .Dirty Then
+            DoCmd.Beep
+         End If
+        If .NewRecord And .Dirty Then
+            Me.Undo
+         End If
+        
+     End With
+    
+Err_Handler:
+    If Err Then
+        MsgBox "Error: " & Err.Number & vbNewLine & _
+                "Error Description: " & Err.Description & vbNewLine & _
+                "Please contact the Administrator Tim Weber"
+     End If
+End Sub
+
+'****************************************************************************
+'****************************************************************************
+'*** 4/4/2016 Added as code for testing to try and eliminate the Access Macro used by cmdDelete
+
+'Private Sub txtDivName_Click()
+'    On Error GoTo Err_Handler
+'
+'    Forms![Contact Details]!sfmContactGroups.SetFocus
+'    Forms![Contact Details]!sfmContactGroups!txtDivName.SetFocus
+'
+'    DoCmd.RunCommand acCmdSelectRecord
+''    Debug.Print Me.CurrentRecord
+''
+''    Debug.Print Me.Name & "|"
+''
+''    With Me
+''        If Not .NewRecord Then
+''            DoCmd.RunCommand acCmdSelectRecord
+''            DoCmd.RunCommand acCmdDeleteRecord
+''         End If
+''        If .NewRecord And Not .Dirty Then
+''            DoCmd.Beep
+''         End If
+''        If .NewRecord And .Dirty Then
+''            Me.Undo
+''         End If
+''
+''     End With
+'
+'Err_Handler:
+'    If Err Then
+'        MsgBox "Error: " & Err.Number & vbNewLine & _
+'                "Error Description: " & Err.Description & vbNewLine & _
+'                "Please contact the Administrator: Tim Weber"
+'     End If
+'
+'End Sub
+'****************************************************************************
+'****************************************************************************
+'****************************************************************************

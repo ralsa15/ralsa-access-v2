@@ -1,0 +1,45 @@
+Option Compare Database
+Option Explicit
+
+Private Sub Form_GotFocus()
+    Me.Refresh
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+    Dim MyUserAuth As Long
+    Dim SeeUser As Boolean, SeeUserDetails As Boolean, AddUser As Boolean
+    
+    SeeUser = False
+    SeeUserDetails = False
+    AddUser = False
+    
+    MyUserAuth = useLocalVar("lv_iUserAuthLvl")
+    
+    Select Case MyUserAuth
+        Case Is > 2
+            SeeUser = True
+            SeeUserDetails = True
+            AddUser = True
+        Case Is = 2
+            SeeUser = True
+            SeeUserDetails = False
+            AddUser = True
+        Case Is = 1
+     End Select
+     
+     If SeeUser Then
+        Me.Page_UserInfo.Visible = True
+        Me.sfrm_User.Visible = True
+      End If
+     If SeeUserDetails Then
+        Me.sfrm_User!stCurrentForm.Visible = True
+        Me.sfrm_User.Controls("stCurrentField").Visible = True
+        Me.sfrm_User.Controls("strMachine").Visible = True
+        Me.sfrm_User.Controls("strDBVersion").Visible = True
+      End If
+     If AddUser Then
+        Me.sfrm_User.Controls("Label_CreateUser").Visible = True
+        Me.sfrm_User.Controls("iUserAuthLvl").ValidationRule = ">0 And <" & MyUserAuth
+      End If
+     
+End Sub

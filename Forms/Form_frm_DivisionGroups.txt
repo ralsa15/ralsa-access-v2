@@ -1,0 +1,23 @@
+Option Compare Database
+
+Private Sub cbDivFilter_AfterUpdate()
+    'Me.Filter = "iDivision = " & Me.cbDivFilter
+    'Me.FilterOn = True
+    
+    Me.RecordSource = "SELECT * FROM tblGroups WHERE iDivision = " & Me.cbDivFilter & ";"
+    
+    Me.Requery
+End Sub
+
+Private Sub cmdAdd_Click()
+    Me.AllowAdditions = True
+    'Me.DataEntry = True
+    Me.Requery
+    Me.iContactID.Locked = False
+    Me.iDivision.DefaultValue = Me.cbDivFilter
+    DoCmd.GoToRecord acDataForm, Me.Name, acNewRec
+End Sub
+
+Private Sub iContactID_Exit(Cancel As Integer)
+    Me.iContactID.Locked = True
+End Sub

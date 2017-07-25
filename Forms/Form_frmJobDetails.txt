@@ -1,0 +1,131 @@
+Option Compare Database
+Option Explicit
+
+Private Sub Box_Headers_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    ClearAll True, Me
+End Sub
+
+Private Sub cmdClose_Click()
+    DoCmd.Close acForm, "frmJobDetails"
+    RequeryForm
+End Sub
+
+Private Sub Form_Current()
+    Dim iRec As Long, iSubRec As Long
+    iRec = Me.anAutoNumber
+    iSubRec = Me.fkSubmissionID
+    If (Me.AM_Status = "" Or IsNull(Me.AM_Status)) Then
+        Me.hlk_Approve.Visible = False
+        Me.hlk_Reject.Visible = False
+     End If
+    If Me.dtFinalApproval <> "" And Not IsNull(Me.dtFinalApproval) Then
+        Me.tbFinalApproval.Visible = True
+        Me.hlk_Approve.Visible = False
+        Me.hlk_Reject.Visible = False
+     End If
+    If Me.fkStatusRA = 7 Then
+        Me.Label_VtSync.Visible = True
+        Me.hlk_Approve.Visible = False
+        Me.hlk_Reject.Visible = False
+     End If
+    If Me.tbStatus = "Complete" Or Me.tbStatus = "Closed" Then
+        Me.tbStatus.BackColor = 12517351
+        Me.tbStatus.BorderColor = 47478
+        Me.tbStatus.ForeColor = 35673
+     End If
+    Me.lsbRegOnlyNotes.RowSource = "SELECT Log_RaJobNotes.anJobNoteID, Log_RaJobNotes.[fkJobID], Format([dtJobNote],'Short Date') AS [Date], Log_RaJobNotes.txtNote, Log_RaJobNotes.txtNoteBy, * FROM Log_RaJobNotes WHERE Log_RaJobNotes.[fkJobID] = " & iRec & " ORDER BY Log_RaJobNotes.dtJobNote DESC; "
+    Me.lsbNotesVT.RowSource = "SELECT Log_Activity.ID, Format([Log_Activity].[dtActivityStamp],'m/d/yyyy') AS [Date], Log_Activity.txtSummary, Log_Activity.UserName, Log_Activity.fkJobID FROM Log_Activity WHERE Log_Activity.fkJobID = " & iRec & " Or Log_Activity.fkSubID = " & iSubRec & " ORDER BY Log_Activity.dtActivityStamp DESC; "
+End Sub
+
+Private Sub Form_GotFocus()
+    Me.Refresh
+End Sub
+
+Private Sub Form_Load()
+    With Me
+        If .tbJobType = "Ad/Prom" Then
+            .tbForm.Visible = False
+            .tbForm.Enabled = False
+            .tbSubmissionID.Visible = False
+            .tbSubmissionID.Enabled = False
+            .Label_MedDevClass.Visible = False
+            .MedDeviceClass.Visible = False
+            .MedDeviceClass.Enabled = False
+            .tbMaterialNum.ControlSource = "txtMktNum"
+            .Label_Material.Caption = "MKT#"
+            .tbVendor.ControlSource = "txtLitNum"
+            .Label_Vendor.Caption = "Lit#"
+            .tbVendor.TextAlign = 0
+            Debug.Print .tbVendor.Layout
+            '.tbVendor.Width = 2145
+         End If
+    End With
+End Sub
+
+Private Sub Form_Resize()
+'    Me.Width = Me.InsideWidth * 0.89164086687
+'    Me.tabTasks.Width = Me.Width * 0.972222222222
+'    Me.lsbNotesVT.Width = Me.tabTasks.Width * 0.8416666
+'    Me.lsbNotesVT.ColumnWidths = ".75in;" & lsbNotesVT.Width - (1.75 * 1440) & ";1.25in"
+End Sub
+
+Private Sub FormHeader_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    ClearAll True, Me
+End Sub
+
+Private Sub hlk_Approve_Click()
+    DoCmd.OpenForm "frmJobApproval", acNormal, , "[anAutoNumber] = " & anAutoNumber & "", acFormEdit, acDialog, Nz(Me.MedDeviceClass, " ") & "|3|" & Nz(Me.JobType, " ")
+    Me.lsbRegOnlyNotes.Requery
+    Me.lsbNotesVT.Requery
+    Me.Requery
+End Sub
+
+Private Sub hlk_Approve_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    fLabelMouseDown "hlk_Approve"
+End Sub
+
+Private Sub hlk_Approve_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "hlk_Approve", Me, 16777214 ' 15921906
+End Sub
+
+Private Sub hlk_RecordActivity_Click()
+    DoCmd.OpenForm "frmJobActivity", acNormal, , "[anAutoNumber] = " & anAutoNumber & "", acFormEdit, acDialog, Nz(Me.MedDeviceClass, " ") & "|0|" & Nz(Me.JobType, " ")
+    Me.lsbRegOnlyNotes.Requery
+    Me.lsbNotesVT.Requery
+    Me.Requery
+End Sub
+
+Private Sub hlk_RecordActivity_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    fLabelMouseDown "hlk_RecordActivity"
+End Sub
+
+Private Sub hlk_RecordActivity_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "hlk_RecordActivity", Me, 16777214 ' 15921906
+End Sub
+
+Private Sub hlk_Reject_Click()
+    DoCmd.OpenForm "frmJobActivity", acNormal, , "[anAutoNumber] = " & anAutoNumber & "", acFormEdit, acDialog, Nz(Me.MedDeviceClass, " ") & "|9|" & Nz(Me.JobType, " ")
+    Me.lsbRegOnlyNotes.Requery
+    Me.lsbNotesVT.Requery
+    Me.Requery
+End Sub
+
+Private Sub hlk_Reject_MouseDown(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    fLabelMouseDown "hlk_Reject"
+End Sub
+
+Private Sub hlk_Reject_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "hlk_Reject", Me, 16777214
+End Sub
+
+Private Sub Jobs_Page_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    ClearAll True, Me
+End Sub
+
+Private Sub lsbNotesVT_DblClick(Cancel As Integer)
+    DoCmd.OpenForm "frmChangeDetails", acNormal, , "[ID] = " & lsbNotesVT & "", acFormReadOnly, acNormal, "Job|" & Me.tbJobNumber
+End Sub
+
+Private Sub tabTasks_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    ClearAll True, Me
+End Sub

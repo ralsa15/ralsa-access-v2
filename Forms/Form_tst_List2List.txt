@@ -1,0 +1,180 @@
+Option Compare Database
+
+Private Sub cmd_Add_Click()
+    
+    Dim i As Long, strOptions As String, strIndex As String, aIndex As Variant
+    If Me.lst_LangOptions.ItemsSelected.Count >= 1 Then
+        strOptions = Me.lst_LangSelected.RowSource & ","
+        For i = Me.lst_LangOptions.ItemsSelected.Count - 1 To 0 Step -1
+            With Me.lst_LangOptions
+            Debug.Print .ItemData(.ItemsSelected(i)) & ":ID_Field|" & .Column(1) & ":TextField", "tst_lt_List2List"
+            SelectItem .ItemData(.ItemsSelected(i)) & ":ID_Field|" & .Column(1) & ":TextField", "tst_lt_List2List"
+            
+'            If Not DuplicateItem(Me.lst_LangOptions.ItemData(Me.lst_LangOptions.ItemsSelected(i)), strOptions) Then
+'                strOptions = strOptions & Me.lst_LangOptions.ItemData(Me.lst_LangOptions.ItemsSelected(i)) & ","
+'             End If
+'            strIndex = strIndex & Me.lst_LangOptions.ItemsSelected(i) & ","
+            End With
+         Next i
+'            Me.lst_LangSelected.RowSource = Left(strOptions, Len(strOptions) - 1)
+
+'         aIndex = Split(Left(strIndex, Len(strIndex) - 1), ",")
+'         For i = LBound(aIndex) To UBound(aIndex)
+'           Me.lst_LangOptions.RemoveItem CInt(aIndex(i))
+'         Next i
+     End If
+'    Me.lst_LangOptions.Value = ""
+    Me.Refresh
+End Sub
+
+Private Sub cmd_Remove_Click()
+    If Me.lst_LangSelected.ItemsSelected.Count >= 1 Then
+    
+        For i = Me.lst_LangSelected.ItemsSelected.Count - 1 To 0 Step -1
+            sqlDel = "DELETE * FROM tst_lt_List2List WHERE ID_Field = " & Me.lst_LangSelected.ItemData(Me.lst_LangSelected.ItemsSelected(i))
+            Debug.Print sqlDel
+            CurrentDb.Execute sqlDel, dbFailOnError
+         Next i
+        Me.Refresh
+    End If
+    
+End Sub
+
+Private Sub cmd_Test_Click()
+    Dim message As String
+    message = "Languages Selected:"
+    
+    With Me.lst_LangSelected
+    For lngrow = 0 To .ListCount - 1
+        message = message & vbNewLine & .Column(0, lngrow)
+     Next lngrow
+    End With
+    
+    MsgBox message
+    
+    CurrentDb.Execute "DELETE * FROM tst_lt_List2List", dbFailOnError
+    Me.Refresh
+End Sub
+
+Private Sub Form_Current()
+    If Me.lst_LangOptions <> "" Then
+        Me.cmd_Add.Enabled = True
+     Else: Me.cmd_Add.Enabled = True
+     End If
+End Sub
+
+Public Function fLvwSort(objLvw As Object, iColIdx As Integer) As Byte
+'lvwAscending  0
+'lvwDescending 1
+    With objLvw
+        .Sorted = False
+        If .SortKey <> iColIdx - 1 Then
+            .SortKey = iColIdx - 1
+            .SortOrder = 0
+        Else
+            If .SortOrder = 0 Then
+                .SortOrder = 1
+            Else
+                .SortOrder = 0
+            End If
+        End If
+        .Sorted = True
+        fLvwSort = .SortOrder
+    End With
+End Function
+
+Function DuplicateItem(NewItem As String, Existing As String) As Boolean
+    DuplicateItem = False
+    
+    Dim ExistingList As Variant
+    ExistingList = Split(Existing, ",")
+    
+    Dim i As Long
+    For i = LBound(ExistingList) To UBound(ExistingList)
+        If ExistingList(i) = NewItem Then
+            DuplicateItem = True
+            Exit Function
+         End If
+     Next i
+     
+End Function
+
+Function SelectItem(RecordInfo As String, TargetTable As String)
+    Dim arrRecordInfo
+    Dim RecordPart1, RecordPart2, sqlAdd As String
+    Dim RecordPart1Field As String, RecordPart1Data As String
+    Dim RecordPart2Field As String, RecordPart2Data As String
+
+    arrRecordInfo = Split(RecordInfo, "|")
+    RecordPart1 = Split(arrRecordInfo(0), ":")
+'    RecordPart1Field = RecordPart1(0)
+'    RecordPart1Data = RecordPart1(1)
+
+    RecordPart2 = Split(arrRecordInfo(1), ":")
+'    RecordPart2Field = RecordPart2(0)
+'    RecordPart2Data = RecordPart2(1)
+    
+'    sqlAdd = "INSERT INTO " & TargetTable & " ( " & RecordPart1(0) & ", " & RecordPart2(0) & ") " & _
+'        "SELECT " & Chr(34) & RecordPart1(1) & Chr(34) & ", " & RecordPart2(1)
+    
+    sqlAdd = "INSERT INTO " & TargetTable & " ( " & RecordPart1(1) & ", " & RecordPart2(1) & ") " & _
+        "SELECT " & RecordPart1(0) & ", " & Chr(34) & RecordPart2(0) & Chr(34)
+    Debug.Print sqlAdd
+    CurrentDb.Execute sqlAdd, dbFailOnError
+    
+End Function
+
+Private Sub Original_cmd_Add_Click()
+'    If Me.lst_LangOptions <> "" Then
+'        If Me.lst_LangSelected.RowSource = "" Then
+'            Me.lst_LangSelected.RowSource = Me.lst_LangOptions.Value
+'            Me.lst_LangOptions.RemoveItem (Me.lst_LangOptions.ListIndex)
+'         Else
+'            Me.lst_LangSelected.AddItem Me.lst_LangOptions.Value
+'            Me.lst_LangOptions.RemoveItem (Me.lst_LangOptions.ListIndex)
+'         End If
+'     End If
+'    Me.lst_LangOptions.Value = ""
+    
+    Dim i As Long, strOptions As String, strIndex As String, aIndex As Variant
+    If Me.lst_LangOptions.ItemsSelected.Count >= 1 Then
+        If Me.lst_LangSelected.RowSource = "" Then
+            For i = Me.lst_LangOptions.ItemsSelected.Count - 1 To 0 Step -1
+                strOptions = strOptions & Me.lst_LangOptions.ItemData(Me.lst_LangOptions.ItemsSelected(i)) & ","
+                strIndex = strIndex & Me.lst_LangOptions.ItemsSelected(i) & ","
+             Next i
+                Me.lst_LangSelected.RowSource = Left(strOptions, Len(strOptions) - 1)
+         Else
+            strOptions = Me.lst_LangSelected.RowSource & ","
+            For i = Me.lst_LangOptions.ItemsSelected.Count - 1 To 0 Step -1
+                If Not DuplicateItem(Me.lst_LangOptions.ItemData(Me.lst_LangOptions.ItemsSelected(i)), strOptions) Then
+                    strOptions = strOptions & Me.lst_LangOptions.ItemData(Me.lst_LangOptions.ItemsSelected(i)) & ","
+                 End If
+                strIndex = strIndex & Me.lst_LangOptions.ItemsSelected(i) & ","
+             Next i
+                Me.lst_LangSelected.RowSource = Left(strOptions, Len(strOptions) - 1)
+         End If
+         
+         aIndex = Split(Left(strIndex, Len(strIndex) - 1), ",")
+         For i = LBound(aIndex) To UBound(aIndex)
+           Me.lst_LangOptions.RemoveItem CInt(aIndex(i))
+         Next i
+     End If
+    Me.lst_LangOptions.Value = ""
+End Sub
+
+Private Sub Original_cmd_Remove_Click()
+    If Me.lst_LangSelected <> "" Then
+        If Me.lst_LangOptions.RowSource = "" Then
+            Me.lst_LangOptions.AddItem Me.lst_LangSelected.Value
+            Me.lst_LangSelected.RemoveItem Me.lst_LangSelected.ListIndex
+         Else
+            Me.lst_LangOptions.AddItem Me.lst_LangSelected.Value
+            Me.lst_LangSelected.RemoveItem Me.lst_LangSelected.ListIndex
+         End If
+     End If
+    Me.lst_LangSelected.Value = ""
+    
+'    fLvwSort Me.lst_LangOptions, 0
+    
+End Sub

@@ -1,0 +1,396 @@
+Option Explicit
+Option Compare Database
+Const Row1Top = 1728
+Const Row2Top = 2520
+Const Row3Top = 3312 'tbVtNote Max Row + 543; tabActivity.Height; Detail.Height = '(.2188 + .259)' .4778 + tabActivity.Height
+Const NewRow = 792
+Const HeaderHgt = 360
+Const Col1Lft = 720
+Const Col2Lft = 3384
+Const Col3Lft = 6048
+
+Dim SendToVT As Boolean
+Public ObjectID As Long, ObjectText As String
+
+Private Sub cb_Ctry_AusNZ_AfterUpdate()
+    CountryChangeTrack
+End Sub
+
+Private Sub cb_Ctry_Canada_AfterUpdate()
+    CountryChangeTrack
+End Sub
+
+Private Sub cb_Ctry_EU_AfterUpdate()
+    CountryChangeTrack
+End Sub
+
+Private Sub cb_Ctry_Japan_AfterUpdate()
+    CountryChangeTrack
+End Sub
+
+Private Sub cb_Ctry_LatinAmerica_AfterUpdate()
+    CountryChangeTrack
+End Sub
+
+Private Sub cb_Ctry_US_AfterUpdate()
+    CountryChangeTrack
+End Sub
+
+Private Sub cbAction_AfterUpdate()
+    Dim ctrl As Control
+    
+    With Me!Jobs_Page.Controls
+
+    For Each ctrl In Me!Jobs_Page.Controls
+        'Adding these phrases to Tags will automatically apply these attributes to the controls
+        ' and will require them to be reversed conditionally as below
+        Debug.Print ctrl.Name & ": " & ctrl.ControlType & " | " & ctrl.Tag
+        
+        If ctrl.Tag Like "*NoLock*" Then 'And ctrl.ControlType = 111 Then 'ControlType 111 is ComboBox
+            ctrl.Locked = False
+         End If
+        If ctrl.Tag Like "*Enable*" Then
+            ctrl.Enabled = False
+         End If
+        If ctrl.Tag Like "*Visible*" Then
+            ctrl.Visible = False
+         End If
+        If ctrl.Tag Like "*Test*" Then
+            If ctrl.Value <> ctrl.OldValue Then
+                ctrl.Value = ctrl.OldValue
+             End If
+         End If
+        If ctrl.Tag Like "*Req*" Then
+            ctrl.BorderColor = 0
+            ctrl.BackColor = 16777215
+         End If
+     Next
+    End With
+    
+    SendToVT = False
+    
+    With Me
+    
+    .cbActReason.Value = ""
+    .cbExtReason.Value = ""
+
+    '.cbStatus.Value = .fkFormStatus
+    
+    Select Case .cbAction
+        Case 8 'Update Details
+            ResizeForm 3
+            Select Case .fkRequestForm
+                Case 2
+                Case Else
+                    .Label_Languages.Visible = True
+                    .cbLanguages.Visible = True
+                    .cbLanguages.Locked = False
+                    .cbLanguages.Enabled = True
+             End Select
+            '.cbStatus.Visible = True
+            .Label_DivReviewer.Visible = True
+            .cbDivReviewer.Visible = True
+            .cbDivReviewer.Locked = False
+            .cbDivReviewer.Enabled = True
+            .Label_QaReviewer.Visible = True
+            .cbApproverQA.Visible = True
+            .cbApproverQA.Locked = False
+            .cbApproverQA.Enabled = True
+            .cbMedDeviceClass.Visible = True
+            .cbMedDeviceClass.Locked = False
+            .cbMedDeviceClass.Enabled = True
+            .Label_Vendor.Visible = True
+            .tbVendorCode.Visible = True
+            .tbVendorCode.Locked = False
+            .tbVendorCode.Enabled = True
+
+        Case Else
+     End Select
+
+    .cbActReason.RowSource = "SELECT tblActionNotes.* FROM tblActionNotes WHERE ((tblActionNotes.txtSubOrder)>0 AND txtRelevantAction Like '*;" & .cbAction & _
+                ";*') ORDER BY tblActionNotes.txtSubOrder; "
+
+    End With
+    SummaryTest Me
+End Sub
+
+Private Sub cbActReason_AfterUpdate()
+    
+    Dim TagChange As String, Action As Long
+    Action = Me.cbAction
+    TagChange = Me.tbSubNotes.Tag
+    Me.tbSubNotes.Tag = Replace(TagChange, "~Req9", "")
+    'Me.chkIncludeInVT.Enabled = True
+    
+    With Me.cbExtReason
+    Select Case cbActReason
+        Case 2, 3, 9, 10, 28, 29
+            ResizeForm 3
+            Me.Label_ExtendReason.Visible = True
+            .Visible = True
+            .Locked = False
+            .RowSource = "SELECT ID, txtExtendedNote FROM tblActionNotesExt WHERE fkActionNote = " & cbActReason & " ;"
+            .DefaultValue = [cbExtReason].ItemData(0)
+        Case 7
+            ResizeForm 3
+            Me.Label_ExtendReason.Visible = True
+            .Visible = True
+            .RowSource = "SELECT ID, txtExtendedNote FROM tblActionNotesExt WHERE fkActionNote = " & cbActReason & " ;"
+            Select Case Me.tbForm
+                Case "F1"
+                    .DefaultValue = [cbExtReason].ItemData(1)
+                Case "F2"
+                    .DefaultValue = [cbExtReason].ItemData(0)
+                Case Else
+             End Select
+        Case 30
+            Me.chkIncludeNotesVT.Value = True
+            Me.chkIncludeNotesVT.Enabled = False
+            
+            If TagChange Like "*~Req9*" Then
+             Else
+                Me.tbSubNotes.Tag = TagChange & "~Req9"
+             End If
+        Case Else
+            ResizeForm 2
+            .RowSource = ""
+            .Value = ""
+            Me.Label_ExtendReason.Visible = False
+            .Visible = False
+     End Select
+
+    SummaryTest Me
+    End With
+End Sub
+
+Private Sub cbApproverQA_AfterUpdate()
+    ChangeTrack Me.cbApproverQA
+End Sub
+
+Private Sub cbDivReviewer_AfterUpdate()
+    ChangeTrack Me.cbDivReviewer
+    SummaryTest Me
+End Sub
+
+Private Sub cbExtReason_AfterUpdate()
+    SummaryTest Me
+End Sub
+
+Private Sub chkFloodJobs_Click()
+    SummaryTest Me
+End Sub
+
+Private Sub cbInitiator_AfterUpdate()
+    ChangeTrack Me.cbInitiator
+End Sub
+
+Private Sub cbLanguages_AfterUpdate()
+    ChangeTrack Me.cbLanguages
+End Sub
+
+Private Sub cbMedDeviceClass_AfterUpdate()
+    ChangeTrack Me.cbMedDeviceClass
+End Sub
+Private Function CountryChangeTrack()
+    If IsNull(Me.cb_Ctry_US) Then Me.cb_Ctry_US.Value = -1
+    If IsNull(Me.cb_Ctry_EU) Then Me.cb_Ctry_EU.Value = 0
+    If IsNull(Me.cb_Ctry_Canada) Then Me.cb_Ctry_Canada.Value = 0
+    If IsNull(Me.cb_Ctry_Japan) Then Me.cb_Ctry_Japan.Value = 0
+    If IsNull(Me.cb_Ctry_AusNZ) Then Me.cb_Ctry_AusNZ.Value = 0
+    If IsNull(Me.cb_Ctry_LatinAmerica) Then Me.cb_Ctry_LatinAmerica.Value = 0
+    ChangeTrack Me.cb_Ctry_US
+    ChangeTrack Me.cb_Ctry_EU
+    ChangeTrack Me.cb_Ctry_Canada
+    ChangeTrack Me.cb_Ctry_AusNZ
+    ChangeTrack Me.cb_Ctry_LatinAmerica
+    ChangeTrack Me.cb_Ctry_Japan
+End Function
+
+'Private Sub chk_Ctry_AusNZ_AfterUpdate()
+'    CountryChangeTrack
+'End Sub
+'
+'Private Sub chk_Ctry_Canada_AfterUpdate()
+'    CountryChangeTrack
+'End Sub
+'
+'Private Sub chk_Ctry_EU_AfterUpdate()
+'    CountryChangeTrack
+'End Sub
+'
+'Private Sub chk_Ctry_Japan_AfterUpdate()
+'    CountryChangeTrack
+'End Sub
+'
+'Private Sub chk_Ctry_LatinAmerica_AfterUpdate()
+'    CountryChangeTrack
+'End Sub
+'
+'Private Sub chk_Ctry_US_AfterUpdate()
+'    CountryChangeTrack
+'End Sub
+
+Private Sub chkIncludeNotesVT_Click()
+    SummaryTest Me
+    If SendToVT = False And Me.chkIncludeNotesVT Then SendToVT = True
+End Sub
+
+Private Sub cmdCancel_Click()
+    Form_Close
+End Sub
+
+Private Sub cmdSaveClose_Click()
+    On Error GoTo Error_Handler
+    'SubmissionActivity & Intention to rewrite as generic Sub so New Submissions can also call the Sub
+    Dim Valid As Boolean, SubID As Long
+    SubID = Me.anSubmissionID
+    Valid = ActivityValidate(Me)    'modActivityForm
+    If Valid Then
+        RecActivity Me, SendToVT 'NewfrmFunctions
+        UpdateMarkets
+        SaveAndCloseForm Me 'NewfrmFunctions
+        UpdateListTextFields 1, SubID
+     End If
+    Exit Sub
+Error_Handler:
+    MsgBox "Error: " & Err.Number & vbNewLine & "Description: " & Err.Description
+
+End Sub
+
+Private Function ResizeForm(MyRows As Long)
+    'tbVtNote Max Row + 543 (TWPS)
+    'tabActivity.Height tbVtNote.Top + 1 - .2188 + .1312
+    'Detail.Height = '(.2188 + .259)' .4778 + tabActivity.Height
+    Dim Movement As Long
+    Select Case MyRows
+        Case 1
+            Movement = Row2Top
+        Case 2
+            Movement = Row3Top
+        Case 3
+            Movement = Row3Top + NewRow
+     End Select
+     
+    With Me
+        '.chkFloodJobs.Top = (Movement - 792)
+        '.Label_FloodJobs.Top = (Movement - 936)
+        .tbVtNote.Top = (Movement - 279)
+        '.Jobs_Page.Height = .tbNotesVT.Top + 2460 '4495
+        .tabActivity.Height = .tbVtNote.Top + 1314
+        .Detail.Height = .tabActivity.Height + 373
+        .InsideHeight = .Detail.Height + .FormHeader.Height + 320 '6510
+    End With
+End Function
+
+Private Sub Form_Close()
+    ObjectID = 0
+    ObjectText = ""
+    CancelAndCloseForm Me
+    OldStatus = 0
+    OldLabeler = 0
+    OldReviewer = 0
+End Sub
+
+Private Sub Form_Current()
+    If Me.chk_Ctry_US = True Then Me.chk_Ctry_US.Locked = True
+End Sub
+
+Private Sub Form_Load()
+    ResizeForm 1
+    Dim args
+    args = Split(Me.OpenArgs, "|")
+    
+    Select Case args(0)
+        Case 0
+        Case 3
+            Me.cbAction.RowSource = "SELECT tblActions.ID, tblActions.txtAction, tblActions.txtDescriptionForm FROM tblActions WHERE tblActions.ID = 3;"
+            Me.cbAction.Locked = True
+            'Me.cbAction.Enabled = False
+     End Select
+    OldStatus = Me.cbStatus
+    'OldLabeler = Me.cbAssignedTo
+    OldReviewer = Me.cbDivReviewer
+    Me.tbActionDate.Locked = True
+    Me.tbActionDate.Enabled = False
+    
+    PopulateMarkets
+    cbAction_AfterUpdate
+    ObjectID = Me.anSubmissionID
+    ObjectText = Me.stSubmissionEntry
+    BeginChangeTrack Me, 1
+    
+End Sub
+
+Private Sub tbSubNotes_AfterUpdate()
+    If Me.tbSubNotes = "" Or IsNull(Me.tbSubNotes) Then
+        Me.chkIncludeNotesVT.Enabled = False
+        Me.chkIncludeNotesVT = Null
+     End If
+    SummaryTest Me
+End Sub
+
+Private Sub tbSubNotes_Change()
+    Me.chkIncludeNotesVT.Enabled = True
+End Sub
+
+Private Function PopulateMarkets()
+    Dim sqlMarkets As String, rstMarkets As DAO.Recordset
+    
+    sqlMarkets = "SELECT * FROM join_SubCountry WHERE fkSubID = " & anSubmissionID
+    Set rstMarkets = CurrentDb.OpenRecordset(sqlMarkets)
+    
+    If Not (rstMarkets.BOF And rstMarkets.EOF) Then
+        With Me
+            .cb_Ctry_AusNZ.Value = rstMarkets!AusNZ_Mkt
+            .cb_Ctry_Canada.Value = rstMarkets!Canada_Mkt
+            .cb_Ctry_EU.Value = rstMarkets!EU_Mkt
+            .cb_Ctry_Japan.Value = rstMarkets!Japan_Mkt
+            .cb_Ctry_LatinAmerica.Value = rstMarkets!LatinAmerica_Mkt
+            .cb_Ctry_US.Value = rstMarkets!US_Mkt
+         End With
+     End If
+    Set rstMarkets = Nothing
+End Function
+
+Private Function UpdateMarkets()
+    Dim sqlMarkets As String, rstMarkets As DAO.Recordset
+    
+    sqlMarkets = "SELECT * FROM join_SubCountry WHERE fkSubID = " & anSubmissionID
+    Set rstMarkets = CurrentDb.OpenRecordset(sqlMarkets)
+    
+    With rstMarkets
+    If Not (rstMarkets.BOF And rstMarkets.EOF) Then
+        .Edit
+            !AusNZ_Mkt = Me.cb_Ctry_AusNZ.Value
+            !Canada_Mkt = Me.cb_Ctry_Canada.Value
+            !EU_Mkt = Me.cb_Ctry_EU.Value
+            !Japan_Mkt = Me.cb_Ctry_Japan.Value
+            !LatinAmerica_Mkt = Me.cb_Ctry_LatinAmerica.Value
+            !US_Mkt = Me.cb_Ctry_US.Value
+        .Update
+     Else
+        .AddNew
+            !fkSubID = anSubmissionID
+            !AusNZ_Mkt = Me.cb_Ctry_AusNZ.Value
+            !Canada_Mkt = Me.cb_Ctry_Canada.Value
+            !EU_Mkt = Me.cb_Ctry_EU.Value
+            !Japan_Mkt = Me.cb_Ctry_Japan.Value
+            !LatinAmerica_Mkt = Me.cb_Ctry_LatinAmerica.Value
+            !US_Mkt = Me.cb_Ctry_US.Value
+        .Update
+     End If
+     End With
+    Set rstMarkets = Nothing
+End Function
+
+Function ChangeTest()
+    Dim CtrlValues As Collection
+    Set CtrlValues = New Collection
+    
+    'CtrlValues.Add ctrl.Value, ctrl.Name
+    
+End Function
+
+Private Sub tbVendorCode_AfterUpdate()
+    ChangeTrack Me.tbVendorCode
+End Sub

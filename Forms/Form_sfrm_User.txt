@@ -1,0 +1,78 @@
+Option Compare Database
+
+Private Sub Detail_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    ClearAll True, Me
+End Sub
+
+Private Sub Form_Current()
+    With Me
+        Select Case .iContactID 'Forms![Contact Details].sfrm_User.Form.iContactID
+            Case Is > 0
+                .Label_CreateUser.Caption = "Edit User"
+                .Label_CreateUser.ControlTipText = "Edit Details for this User"
+            Case Is = 0
+                .Label_CreateUser.Caption = "Create User from Contact"
+                .Label_CreateUser.ControlTipText = "Create a New User for this Contact"
+            Case Else
+                .Label_CreateUser.Caption = "Create User from Contact"
+                .Label_CreateUser.ControlTipText = "Create a New User for this Contact"
+         End Select
+     End With
+End Sub
+
+Private Sub iUserAuthLvl_AfterUpdate()
+'    ChangeTrack Me.iUserAuthLvl
+End Sub
+
+Private Sub Label_MyCancel_Click()
+    Dim LblCaption As String
+    With Me
+        .Undo
+        .Parent.Controls("sfrm_User").Requery
+        .Label_MyCancel.Visible = False
+     End With
+End Sub
+
+Private Sub Label_MyCancel_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    If Me.Label_MyCancel.BackColor <> 16777215 Then Highlight "Label_MyCancel", Me, 9664856
+End Sub
+
+Private Sub Label_CreateUser_Click()
+    With Me
+        Select Case .Label_CreateUser.Caption
+            Case "Create User from Contact"
+'                BeginChangeTrack
+                .DataEntry = True
+                .iContactID = Forms![Contact Details].ID
+                '.txtUserID = Left(Forms![Contact Details].txtEmailAddress, InStr(Forms![Contact Details].txtEmailAddress, "@") - 1)
+                .txtUserID = Forms![Contact Details].MSExchangeAccount
+                If IsNull(.txtUserID) Or .txtUserID = "" Then
+                    .txtUserID.Locked = False
+                 End If
+                .Label_CreateUser.Caption = "Save"
+                .Label_MyCancel.ControlTipText = "Cancel Addition of User"
+                .Label_MyCancel.Visible = True
+                .iUserAuthLvl = 1
+                .txtUserStatus = "Logged Out"
+            Case "Edit User"
+'                BeginChangeTrack
+                .AllowEdits = True
+                .Label_CreateUser.Caption = "Save"
+                .Label_MyCancel.ControlTipText = "Cancel Edits"
+                .Label_MyCancel.Visible = True
+            Case "Save"
+'                EndChangeTrack
+                .DataEntry = False
+                .AllowEdits = False
+                .Label_MyCancel.Visible = False
+         End Select
+     End With
+End Sub
+
+Private Sub Label_CreateUser_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    If Me.Label_CreateUser.BackColor <> 16777215 Then Highlight "Label_CreateUser", Me, 9664856
+End Sub
+
+Private Sub txtUserID_AfterUpdate()
+'    ChangeTrack Me.txtUserID
+End Sub

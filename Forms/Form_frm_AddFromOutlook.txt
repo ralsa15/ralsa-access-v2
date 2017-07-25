@@ -1,0 +1,76 @@
+Option Compare Database
+
+Private Sub Form_Load()
+    On Error GoTo IErrored
+
+    CurrentDb.Execute "DELETE * FROM lt_Contacts", dbFailOnError
+
+    DoCmd.RunCommand acCmdAddFromOutlook
+    
+    If IsNull(Me.txtFirstName) And IsNull(Me.txtLastName) And IsNull(Me.txtEmailAddress) Then
+     Else
+        ImportContactsFromOutlook
+        CurrentDb.Execute "INSERT INTO tblContacts ( txtCompany, txtLastName, txtFirstName, txtEmailAddress, " & _
+            "txtJobTitle, txtDepartment, txtBusinessPhone, " & _
+            "txtHomePhone, txtMobilePhone, txtFaxNumber, txtAddress, txtCity, txtStateProvince, txtZipPostalCode, " & _
+            "txtCountryRegion, MSExchangeAccount, MSExchangeDisplayAs ) " & _
+            "SELECT lt_Contacts.txtCompany, lt_Contacts.txtLastName, lt_Contacts.txtFirstName, lt_Contacts.txtEmailAddress, " & _
+            "lt_Contacts.txtJobTitle, lt_Contacts.txtDepartment, lt_Contacts.txtBusinessPhone, lt_Contacts.txtHomePhone, " & _
+            "lt_Contacts.txtMobilePhone, lt_Contacts.txtFaxNumber, lt_Contacts.txtAddress, lt_Contacts.txtCity, " & _
+            "lt_Contacts.txtStateProvince, lt_Contacts.txtZipPostalCode, lt_Contacts.txtCountryRegion, lt_Contacts.txtAlias, " & _
+            "lt_Contacts.txtDisplayAs " & _
+            "FROM lt_Contacts;", dbFailOnError
+        
+        If Not Err Then MsgBox "Don't forget to add Contact(s) to Groups!", , "RALSA - New Contact(s)"
+     End If
+
+ResumeFinish:
+    CurrentDb.Execute "DELETE * FROM lt_Contacts", dbFailOnError
+    DoCmd.Close acForm, "frm_AddFromOutlook"
+    Exit Sub
+    
+IErrored:
+    MsgBox "ERROR ADDING CONTACT!" & vbNewLine & "Error: " & Err.Number & vbNewLine & "Descr: " & Err.Description, vbCritical, "ERROR!"
+    Resume ResumeFinish
+End Sub
+
+Function ImportContactsFromOutlook()
+
+   ' This code is based in Microsoft Access.
+
+   ' Set up DAO objects (uses existing "tblContacts" table)
+   Dim rst As DAO.Recordset
+   Set rst = CurrentDb.OpenRecordset("lt_Contacts")
+
+   ' Set up Outlook objects.
+   Dim ol As New Outlook.Application
+   Dim olns As Outlook.Namespace
+   Dim cf As Outlook.AddressList
+   Dim olRec As Outlook.Recipient
+   Dim olExU As Outlook.ExchangeUser
+   
+   Set olns = ol.GetNamespace("MAPI")
+   Set cf = olns.GetGlobalAddressList
+   Set olRec = ol.Session.CreateRecipient(rst!txtEmailAddress)
+    olRec.Resolve
+   
+    If olRec.AddressEntry.AddressEntryUserType = olExchangeUserAddressEntry Then
+        Set olExU = olRec.AddressEntry.GetExchangeUser
+        With olExU
+            rst.Edit
+            If Not IsNull(.Alias) Then rst!txtAlias = .Alias
+            If Not IsNull(.Department) Then rst!txtDepartment = .Department
+            If Not IsNull(.Name) Then rst!txtDisplayAs = .Name
+            If Not IsNull(.MobileTelephoneNumber) And .MobileTelephoneNumber <> "" Then rst!txtMobilePhone = .MobileTelephoneNumber
+            If Not IsNull(.StreetAddress) And .StreetAddress <> "" Then rst!txtAddress = .StreetAddress
+            If Not IsNull(.City) And .City <> "" Then rst!txtCity = .City
+            If Not IsNull(.StateOrProvince) And .StateOrProvince <> "" Then rst!txtStateProvince = .StateOrProvince
+            If Not IsNull(.PostalCode) And .PostalCode <> "" Then rst!txtZipPostalCode = .PostalCode
+'            ' Custom Outlook properties would look like this:
+'            ' rst!AccessFieldName = c.UserProperties("OutlookPropertyName")
+            rst.Update
+         End With
+     End If
+      rst.Close
+   
+End Function

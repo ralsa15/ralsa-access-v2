@@ -1,0 +1,390 @@
+Option Compare Database
+Option Explicit
+
+Const Row1Top = 1728
+Const Row2Top = 2520
+Const Row3Top = 3312
+Const NewRow = 792
+Const HeaderHgt = 360
+Const Col1Lft = 720
+Const Col2Lft = 3384
+Const Col3Lft = 6048
+
+Dim SendToVT As Boolean
+Dim DeviceClass As String, JobType As String
+Public ObjectID As Long, ObjectText As String
+
+
+Private Sub cbAction_AfterUpdate()
+    Dim ctrl As Control
+    
+    For Each ctrl In Me!Jobs_Page.Controls
+            'Adding these phrases to Tags will automatically apply these attributes to the controls
+            ' and will require them to be reversed conditionally as below
+            'Debug.Print ctrl.Name & ": " & ctrl.ControlType
+            'MsgBox ctrl.Name & " | " & ctrl.ControlType & vbNewLine & "Tag: " & ctrl.Tag
+            
+            If ctrl.Tag Like "*LockMe*" Then
+                ctrl.Locked = True
+             End If
+            If ctrl.Tag Like "*HideMe*" Then
+                ctrl.Visible = False
+             End If
+            If ctrl.Tag Like "*Test*" Then
+                If ctrl.Value <> ctrl.OldValue Then
+                    ctrl.Value = ctrl.OldValue
+                 End If
+             End If
+            If ctrl.Tag Like "*Req*" Then
+                ctrl.BorderColor = 0
+                ctrl.BackColor = 16777215
+             End If
+
+         Next
+    
+    SendToVT = True
+    
+    With Me
+        .tbJobName.ForeColor = 5268080
+        .Label_JobName.BackColor = 14937070
+        .cmdSaveClose.Enabled = True
+        .tbNotesRA.BackColor = 13097182
+        .tbNotesRA.BorderColor = 0
+        .tbNotesVT.BackColor = 16777215
+        '.cbStatus.RowSource = "SELECT tblJobStatuses.* FROM tblJobStatuses WHERE tblJobStatuses.RaRelevant = True ORDER BY txtJobStatus;"
+        .cbStatus.RowSource = "SELECT tblJobStatuses.* FROM tblJobStatuses ORDER BY txtJobStatus;"
+        .cbStatus.Value = .fkJobStatus
+        .cbActReason.Value = ""
+        .cbSentTo.Value = ""
+        .chkIncludeInVT.Enabled = True
+        .tbActivityDate.Locked = False
+        .tbActivityDate.Enabled = True
+        .tbActivityDate.Value = Now
+        
+        Select Case .cbAction
+            Case 6 'Reassign
+                ResizeForm 2
+                .cbAssignedTo.Visible = True
+                .cbAssignedTo.Locked = False
+                .cbActReason.Visible = True
+            Case 4 'Returned To
+                ResizeForm 2
+                .cbSentTo.Visible = True
+                .cbSentTo.Locked = False
+                .cbActReason.Visible = True
+                .cbStatus.Visible = True
+                .cbStatus.Enabled = True
+                .cbStatus.Locked = False
+                '.cbFloodJobStatus.Visible = True
+                If .fkJobStatus = 24 Or !fkStatusRA = 3 Then 'Use Automaton to update a field on tblJobLog for AM Status
+                    '.cbStatus.Value = 9 'Designer
+                    .cbStatus.Enabled = True
+                    .cbStatus.Locked = False
+                    .cbStatus.RowSource = "SELECT tblJobStatuses.ID, tblJobStatuses.txtJobStatus FROM tblJobStatuses WHERE (((tblJobStatuses.ID) In (9,11,12,13,20,22,27,30,35))) ORDER BY tblJobStatuses.txtJobStatus; "
+                 Else
+                    .cbStatus.RowSource = "SELECT tblJobStatuses.ID, tblJobStatuses.txtJobStatus FROM tblJobStatuses ORDER BY tblJobStatuses.txtJobStatus; "
+                    .cbStatus.Enabled = False
+                    .cbStatus.Locked = True
+                 End If
+            Case 3 'Approve
+                'ResizeForm 2
+'                .cbStatus.Visible = True
+'                .cbStatus.Locked = True
+'                .cbStatus.Value = 36 '5 'Complete
+                !fkStatusRA.Value = 4  'To denote the "RA Status" as Approved
+'                .cbStatus.Enabled = False
+                .tbFinalApproval.Visible = True
+                .tbFinalApproval.Locked = False
+                .tbFinalApproval.Value = Date
+                .tbActivityDate.Value = Now
+                .tbActivityDate.Locked = True
+                .tbActivityDate.Enabled = False
+                
+                If JobType = "Packaging" Then
+                    Select Case DeviceClass
+                        Case "Unclassified (Class 1)", "Class 1", "Class 2", "Class 3"
+                            ResizeForm 2
+                            .cbUDIComplete.Visible = True
+                            .cbUDIComplete.Locked = False
+                            .cbUDIComplete.Enabled = True
+                        Case "Not a Device"
+                            ResizeForm 1
+                            .cbUDIComplete = 3
+                        Case "Undetermined"
+                            MsgBox "Please confirm Medical Device Class (at the Form/Submission level) before approving labeling/Art.", vbCritical, "Medical Device Status Not Confirmed"
+                            .cmdSaveClose.Enabled = False
+                        Case "NA"
+                        Case Else
+                            MsgBox "Please confirm Medical Device Class (at the Form/Submission level) before approving labeling/Art.", vbCritical, "Medical Device Status Not Confirmed"
+                            .cmdSaveClose.Enabled = False
+                     End Select
+                 End If
+            Case 5 'Reject - Cancel
+                ResizeForm 2
+                !fkStatusRA.Value = 2  'To denote the "RA Status" as in the schedule
+                .cbActReason.Visible = True
+                .cbStatus.Visible = True
+                .cbStatus.Locked = True
+                .cbStatus.Value = 3 'Previously: .cbStatus.ItemData(1)
+                .cbStatus.Enabled = False
+            Case 2 'Add Notes
+                ResizeForm 1
+                'If .chkIncludeInVT <> True Then SendToVT = False
+            Case 1 'Received
+                ResizeForm 2
+                'If .chkIncludeInVT <> True Then SendToVT = False
+                .cbActReason.Visible = True
+                .cbStatus.Visible = True
+                .cbStatus.Locked = True
+                .cbStatus.Value = 24 'Previously: .cbStatus.ItemData(0)
+            Case 7 'Reopen
+                ResizeForm 2
+                !fkStatusRA.Value = 2  'To denote the "RA Status" as in the schedule
+                .cbActReason.Visible = True
+                .cbStatus.Visible = True
+                .cbStatus.Enabled = True
+                .cbStatus.Locked = False
+                .cbStatus.Value = 24
+                .tbFinalApproval.Value = Null
+                !dtReOpened = Date
+                .cbUDIComplete.Value = Null
+                .cbStatus.RowSource = "SELECT tblJobStatuses.* FROM tblJobStatuses WHERE tblJobStatuses.RaRelevant = True AND Not tblJobStatuses.ID Between 3 AND 5 ORDER BY txtJobStatus;"
+            Case 8 'Update Details
+                If IsNull(txtJobNumber) Then
+                    .tbJobNumber.Locked = False
+                    .tbJobNumber.TabStop = True
+                    .tbJobNumber.SetFocus
+                    .cbAction = 8
+                End If
+                ResizeForm 2
+                SendToVT = False
+                .tbJobName.Locked = False
+                .tbJobName.ForeColor = 2370610 '5268080
+                .Label_JobName.BackColor = 11257037 '14937070
+                .cbStatus.Visible = True
+                If .fkJobStatus = 24 Then
+                    .cbStatus.Enabled = True
+                    .cbStatus.Locked = False
+                 Else
+                    .cbStatus.Locked = True
+                    .cbStatus.Enabled = False
+                 End If
+                .cbStatus.RowSource = "SELECT tblJobStatuses.* FROM tblJobStatuses ORDER BY txtJobStatus;"
+                .Label_DivReviewer.Top = Row2Top - HeaderHgt
+                .cbDivReviewer.Top = Row2Top
+                .cbDivReviewer.Visible = True
+                .cbDivReviewer.Locked = False
+                .Label_MaterialNum.Top = Row2Top - HeaderHgt
+                .tbMaterialNum.Top = Row2Top
+                .tbMaterialNum.Visible = True
+                .tbMaterialNum.Locked = False
+                .tbActivityDate.Locked = True
+                .tbActivityDate.Enabled = False
+                .tbActivityDate.Value = Now
+            Case 9
+                ResizeForm 2
+                .cbActReason.Visible = True
+                !fkStatusRA.Value = 2  'To denote the "RA Status" as in the schedule
+                .cbStatus.RowSource = "SELECT tblJobStatuses.* FROM tblJobStatuses ORDER BY txtJobStatus;"
+            Case Else
+         End Select
+    
+        .cbActReason.RowSource = "SELECT tblActionNotes.* FROM tblActionNotes WHERE ((tblActionNotes.txtLabelOrder)>0 AND txtRelevantAction Like '*;" & .cbAction & _
+                    ";*') ORDER BY tblActionNotes.txtLabelOrder; "
+
+        If .cbAction = 7 Then
+            .cbActReason.RowSource = "SELECT tblReopenReason.* FROM tblReopenReason"
+         End If
+
+        If Not SendToVT Then
+            .tbNotesVT.BackColor = 14937070
+         End If
+    
+    For Each ctrl In Me.Controls
+        If ctrl.Visible = True Then
+            ChangeTrack ctrl
+         End If
+     Next
+    
+    End With
+
+    JobSummaryTest Me
+    
+End Sub
+
+Private Sub cbActReason_AfterUpdate()
+    With Me
+        If .cbActReason = 30 Then
+            .chkIncludeInVT.Value = True
+            .chkIncludeInVT.Enabled = False
+            .tbNotesRA.Tag = .tbNotesRA.Tag & "Required"
+         Else
+            .tbNotesRA.Tag = Replace(.tbNotesRA.Tag, "Required", "")
+            .chkIncludeInVT.Enabled = True
+         End If
+     End With
+    JobSummaryTest Me
+End Sub
+
+Private Sub cbAssignedTo_AfterUpdate()
+    ChangeTrack Me.cbAssignedTo
+    JobSummaryTest Me
+End Sub
+
+Private Sub cbDivReviewer_AfterUpdate()
+    ChangeTrack Me.cbDivReviewer
+    JobSummaryTest Me
+End Sub
+
+Private Sub cbSentTo_AfterUpdate()
+    JobSummaryTest Me
+End Sub
+
+Private Sub cbStatus_AfterUpdate()
+
+    With Me.tbFinalApproval
+        Select Case cbStatus.Value
+            Case 5, 25
+                .Enabled = True
+                .Format = "Short Date"
+                .Value = Date
+            Case Else
+                '.Value = ""
+                .Enabled = False
+         End Select
+     End With
+    ChangeTrack Me.cbStatus
+    ChangeTrack Me.tbFinalApproval
+End Sub
+
+Private Sub cbUDIComplete_AfterUpdate()
+    ChangeTrack Me.cbUDIComplete
+    JobSummaryTest Me
+End Sub
+
+Private Sub chkIncludeInVT_Click()
+    If SendToVT = False And Me.chkIncludeInVT Then SendToVT = True
+    JobSummaryTest Me
+End Sub
+
+Private Sub cmdCancel_Click()
+    Form_Close
+End Sub
+
+Private Sub Form_Close()
+    CancelAndCloseForm Me
+End Sub
+
+Private Sub Form_Load()
+    
+    ResizeForm 1
+    Dim args
+    args = Split(Me.OpenArgs, "|")
+    'DeviceClass = Me.OpenArgs
+    DeviceClass = args(0)
+    JobType = args(2)
+    With Me
+    
+    Select Case args(1)
+        Case 0
+            .cbAction.RowSource = "SELECT tblActions.ID, tblActions.txtAction, tblActions.txtDescriptionJob FROM tblActions WHERE (tblActions.lngJobActOrder > 0) ORDER BY tblActions.lngJobActOrder;"
+        Case 3, 9
+            .cbAction.RowSource = "SELECT tblActions.ID, tblActions.txtAction, tblActions.txtDescriptionJob FROM tblActions WHERE tblActions.ID = " & args(1) & " ORDER BY tblActions.lngJobActOrder;"
+            .cbAction.Locked = True
+            .cbAction.Enabled = False
+     End Select
+'   ****    To allow for Job Reopen Notes to be entered after VT Status is updated by Scheduler; Pending better solution
+'        Select Case .fkJobStatus
+'            Case 3, 4, 5 'Cancelled, CLOSED, Complete Respectively
+'                .cbAction.RowSource = "SELECT tblActions.ID, tblActions.txtAction, tblActions.txtDescriptionJob FROM tblActions WHERE ((tblActions.ID = 2) OR (tblActions.ID = 7) OR (tblActions.ID = 8)) ORDER BY tblActions.lngJobActOrder;"
+'            Case Else
+'                .cbAction.RowSource = "SELECT tblActions.ID, tblActions.txtAction, tblActions.txtDescriptionJob FROM tblActions WHERE ((tblActions.lngJobActOrder > 0) AND (tblActions.ID <> 7)) ORDER BY tblActions.lngJobActOrder;"
+'         End Select
+    End With
+    ObjectID = Me.anAutoNumber
+    If Not IsNull(Me.txtJobNumber) Then ObjectText = Me.txtJobNumber
+    BeginChangeTrack Me, 2
+    cbAction_AfterUpdate
+    JobSummaryTest Me
+    
+End Sub
+
+Private Sub cmdSaveClose_Click()
+    If Me.cbAction = 7 Then
+        Me.fkReOpenedReason = Me.cbActReason
+        Me.dtReOpened = Me.tbActivityDate
+     End If
+    
+    Dim i As Integer
+    For i = 0 To Me.Controls.Count - 1
+        ChangeTrack Me.Controls(i)
+     Next i
+    Dim strTypeErrors As String
+    strTypeErrors = JobActivityValidation(Me)
+    Dim Valid As Boolean, JobID As Long
+    Valid = ActivityValidate(Me, strTypeErrors)
+    If Valid Then
+        JobID = Me.anAutoNumber
+        JobActivity2 Me, SendToVT 'modActivityForm
+        SaveAndCloseForm Me
+        UpdateListTextFields 3, JobID
+     End If
+
+End Sub
+
+Private Function ResizeForm(MyRows As Long)
+    Dim Movement As Long
+    Select Case MyRows
+        Case 1
+            Movement = Row2Top
+        Case 2
+            Movement = Row3Top
+        Case 3
+            Movement = Row3Top + NewRow
+     End Select
+     
+    With Me
+        .tbNotesVT.Top = (Movement - 252)
+        .Jobs_Page.Height = .tbNotesVT.Top + 2820 '4495
+        .tabActivity.Height = .Jobs_Page.Height + 145 '4645
+        .Detail.Height = .tabActivity.Height + 333 '4960
+        .InsideHeight = .Detail.Height + .FormHeader.Height + 415 '6510
+    End With
+End Function
+
+Private Sub tbFinalApproval_AfterUpdate()
+    If Me.cbAction = 3 Then
+        Me.tbActivityDate = Me.tbFinalApproval
+     End If
+    ChangeTrack Me.tbFinalApproval
+End Sub
+
+Private Sub tbJobName_AfterUpdate()
+    ChangeTrack Me.tbJobName
+    JobSummaryTest Me
+End Sub
+
+Private Sub tbJobNumber_AfterUpdate()
+    ChangeTrack Me.tbJobNumber
+    Me.cbAction.Locked = True
+    Me.cbAction.Enabled = False
+    JobSummaryTest Me
+End Sub
+
+Private Sub tbMaterialNum_AfterUpdate()
+    ChangeTrack Me.tbMaterialNum
+End Sub
+
+Private Sub tbNotesRA_AfterUpdate()
+    If (Me.tbNotesRA = "" Or IsNull(Me.tbNotesRA)) And Me.cbActReason <> 30 Then
+        Me.chkIncludeInVT.Enabled = False
+        Me.chkIncludeInVT = Null
+     End If
+    JobSummaryTest Me
+End Sub
+
+Private Sub tbNotesRA_Change()
+    If Me.cbActReason <> 30 Then
+        Me.chkIncludeInVT.Enabled = True
+     End If
+End Sub

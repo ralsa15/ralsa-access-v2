@@ -1,0 +1,366 @@
+Option Explicit
+Option Compare Database
+Const Row1Top = 1728
+Const Row2Top = 2520
+Const Row3Top = 3312 'tbVtNote Max Row + 543; tabActivity.Height; Detail.Height = '(.2188 + .259)' .4778 + tabActivity.Height
+Const NewRow = 792
+Const HeaderHgt = 360
+Const Col1Lft = 720
+Const Col2Lft = 3384
+Const Col3Lft = 6048
+
+Dim SendToVT As Boolean
+Public ObjectID As Long, ObjectText As String
+
+Private Sub cbAction_AfterUpdate()
+    Dim ctrl As Control
+    
+    With Me!Jobs_Page.Controls
+
+    For Each ctrl In Me!Jobs_Page.Controls
+        'Adding these phrases to Tags will automatically apply these attributes to the controls
+        ' and will require them to be reversed conditionally as below
+        Debug.Print ctrl.Name & ": " & ctrl.ControlType & " | " & ctrl.Tag
+        
+        If ctrl.Tag Like "*NoLock*" Then 'And ctrl.ControlType = 111 Then 'ControlType 111 is ComboBox
+            ctrl.Locked = False
+         End If
+        If ctrl.Tag Like "*Enable*" Then
+            ctrl.Enabled = False
+         End If
+        If ctrl.Tag Like "*Visible*" Then
+            ctrl.Visible = False
+         End If
+        If ctrl.Tag Like "*Test*" Then
+            If ctrl.Value <> ctrl.OldValue Then
+                ctrl.Value = ctrl.OldValue
+             End If
+         End If
+        If ctrl.Tag Like "*Req*" Then
+            ctrl.BorderColor = 0
+            ctrl.BackColor = 16777215
+         End If
+     Next
+    End With
+    
+    SendToVT = False
+    
+    With Me
+    
+    .cbActReason.Value = ""
+    .cbExtReason.Value = ""
+    .cbSentTo.Value = ""
+    .cbFloodJobStatus.Value = ""
+    .cbStatus.Value = .fkFormStatus
+    .chkFloodJobs.Value = False
+    
+    Select Case .cbAction
+        Case 6 'Reassign
+            SendToVT = True
+            ResizeForm 2
+            .Label_Assigned_To.Visible = True
+            .cbAssignedTo.Visible = True
+            .cbAssignedTo.Locked = False
+            .cbAssignedTo.Enabled = True
+            .cbActReason.Visible = True
+            .chkFloodJobs.Value = True
+            .chkFloodJobs.Visible = True
+            .chkFloodJobs.Locked = False
+
+        Case 4 'Returned To
+            SendToVT = True
+            ResizeForm 2
+            .Label_SentTo.Visible = True
+            .cbSentTo.Visible = True
+            .cbSentTo.Locked = False
+            .cbSentTo.Enabled = True
+            .cbFloodJobStatus.Visible = True
+            .chkFloodJobs.Value = True
+            .chkFloodJobs.Locked = True
+            .Label_SentTo.Caption = "Sent To (Primary)"
+            .cbActReason.Visible = True
+            .Label_ExtendReason.Visible = True
+            .cbStatus.Visible = True
+            .cbStatus.Locked = True
+            .cbStatus.Enabled = False
+            .cbStatus.Value = .cbStatus.ItemData(3)
+        Case 3 'Approve
+            SendToVT = True
+            .chkFloodJobs.Value = True
+            .cbFloodJobStatus.Value = 30
+            ResizeForm 2
+            .Label_SentTo.Visible = True
+            .Label_SentTo.Caption = "Sent To"
+            .cbSentTo.Visible = True
+            .cbSentTo.Enabled = False
+            .cbSentTo.Locked = True
+            .cbSentTo = 81 'Marketing Traffic
+            .cbStatus.Visible = True
+            .cbStatus.Enabled = False
+            .cbStatus.Locked = True
+            .cbStatus.Value = .cbStatus.ItemData(2)
+            .cbMedDeviceClass.Visible = True
+            .cbMedDeviceClass.Locked = False
+            .cbMedDeviceClass.Enabled = True
+            .cbMedDeviceClass.RowSource = "SELECT tbl_MedDeviceClass.* FROM tbl_MedDeviceClass WHERE tbl_MedDeviceClass.ID < 6;"
+        Case 5 'Reject -- Now Cancel
+            SendToVT = True
+            .chkFloodJobs.Value = True
+            ResizeForm 2
+            .cbActReason.Visible = True
+            '.cbExtReason.Visible = True
+            '.Label_ExtendReason.Visible = True
+            .cbStatus.Visible = True
+            .cbStatus.Locked = True
+            .cbStatus.Enabled = False
+            .cbStatus.Value = .cbStatus.ItemData(1)
+            .cbFloodJobStatus.RowSource = "SELECT tblJobStatuses.ID, tblJobStatuses.txtJobStatus FROM tblJobStatuses ORDER BY tblJobStatuses.txtJobStatus;"
+            .cbFloodJobStatus = 3 'Cancelled; to update Jobs
+        Case 8 'Update Details
+            ResizeForm 3
+            Select Case .fkRequestForm
+                Case 2
+                Case Else
+                    .Label_Languages.Visible = True
+                    .cbLanguages.Visible = True
+                    .cbLanguages.Locked = False
+                    .cbLanguages.Enabled = True
+             End Select
+            .cbStatus.Visible = True
+            .cbFloodJobStatus.Visible = True
+            .Label_DivReviewer.Visible = True
+            .cbDivReviewer.Visible = True
+            .cbDivReviewer.Locked = False
+            .cbDivReviewer.Enabled = True
+            .Label_QaReviewer.Visible = True
+            .cbApproverQA.Visible = True
+            .cbApproverQA.Locked = False
+            .cbApproverQA.Enabled = True
+            .cbMedDeviceClass.Visible = True
+            .cbMedDeviceClass.Locked = False
+            .cbMedDeviceClass.Enabled = True
+            .chkFloodJobs.Visible = True
+            .chkFloodJobs.Locked = False
+            .Label_Vendor.Visible = True
+            .tbVendorCode.Visible = True
+            .tbVendorCode.Locked = False
+            .tbVendorCode.Enabled = True
+        Case 2 'Add Notes
+            ResizeForm 1
+            .cbMedDeviceClass.Locked = True
+            .cbMedDeviceClass.Enabled = False
+        Case 1 'Received
+            ResizeForm 2
+            .cbActReason.Visible = True
+            .cbFloodJobStatus.Visible = True
+            .cbFloodJobStatus.Value = 24
+            .chkFloodJobs.Value = True
+            .chkFloodJobs.Locked = True
+            .cbStatus.Visible = True
+            .cbStatus.Locked = True
+            .cbStatus.Enabled = False
+            .cbStatus.Value = .cbStatus.ItemData(0)
+        Case Else
+     End Select
+
+    .cbActReason.RowSource = "SELECT tblActionNotes.* FROM tblActionNotes WHERE ((tblActionNotes.txtSubOrder)>0 AND txtRelevantAction Like '*;" & .cbAction & _
+                ";*') ORDER BY tblActionNotes.txtSubOrder; "
+
+    End With
+    SummaryTest Me
+End Sub
+
+Private Sub cbActReason_AfterUpdate()
+    
+    Dim Action As Long
+    Action = Me.cbAction
+    Me.tbSubNotes.Tag = Replace(Me.tbSubNotes.Tag, "Required", "")
+    'Me.chkIncludeInVT.Enabled = True
+    
+    With Me.cbExtReason
+    Select Case cbActReason
+        Case 2, 3, 9, 10, 28, 29
+            ResizeForm 3
+            Me.Label_ExtendReason.Visible = True
+            .Visible = True
+            .Locked = False
+            .RowSource = "SELECT ID, txtExtendedNote FROM tblActionNotesExt WHERE fkActionNote = " & cbActReason & " ;"
+            .DefaultValue = [cbExtReason].ItemData(0)
+        Case 7
+            ResizeForm 3
+            Me.Label_ExtendReason.Visible = True
+            .Visible = True
+            .RowSource = "SELECT ID, txtExtendedNote FROM tblActionNotesExt WHERE fkActionNote = " & cbActReason & " ;"
+            Select Case Me.tbForm
+                Case "F1"
+                    .DefaultValue = [cbExtReason].ItemData(1)
+                Case "F2"
+                    .DefaultValue = [cbExtReason].ItemData(0)
+                Case Else
+             End Select
+        Case 30
+            Me.chkIncludeNotesVT.Value = True
+            Me.chkIncludeNotesVT.Enabled = False
+            Me.tbSubNotes.Tag = Me.tbSubNotes.Tag & "Required"
+        Case Else
+            ResizeForm 2
+            .RowSource = ""
+            .Value = ""
+            Me.Label_ExtendReason.Visible = False
+            .Visible = False
+     End Select
+
+    SummaryTest Me
+    End With
+End Sub
+
+Private Sub cbAssignedTo_AfterUpdate()
+    SummaryTest Me
+End Sub
+
+Private Sub cbDivReviewer_AfterUpdate()
+    SummaryTest Me
+End Sub
+
+Private Sub cbExtReason_AfterUpdate()
+    SummaryTest Me
+End Sub
+
+Private Sub cbFloodJobStatus_AfterUpdate()
+    ChangeTrack Me.cbFloodJobStatus
+End Sub
+
+Private Sub cbSentTo_AfterUpdate()
+    SummaryTest Me
+End Sub
+
+Private Sub cbStatus_AfterUpdate()
+    ChangeTrack Me.cbStatus
+End Sub
+
+Private Sub chkFloodJobs_Click()
+    SummaryTest Me
+End Sub
+
+Private Sub chkIncludeNotesVT_Click()
+    SummaryTest Me
+    If SendToVT = False And Me.chkIncludeNotesVT = True Then SendToVT = True
+End Sub
+
+Private Sub cmdCancel_Click()
+    Form_Close
+End Sub
+
+Private Sub cmdSaveClose_Click()
+    ChangeTrack Me.cbFloodJobStatus
+    ChangeTrack Me.cbStatus
+    'SubmissionActivity & Intention to rewrite as generic Sub so New Submissions can also call the Sub
+    Dim Valid As Boolean, SubID As Long
+    SubID = Me.anSubmissionID
+    Dim strTypeErrors As String
+    strTypeErrors = SubActivityValidation(Me)
+    Valid = ActivityValidate(Me, strTypeErrors)    'modActivityForm
+    If Valid Then
+        RecActivity Me, SendToVT, Me.chkFloodJobs.Value 'NewfrmFunctions
+        SaveAndCloseForm Me 'NewfrmFunctions
+        UpdateListTextFields 1, SubID
+     End If
+
+End Sub
+
+Function LogActivity(LogName As String, ParentID As String, Activity As String, ActivityID As String, ActReason As String, DateStamp As Date, UserID As Long) As Boolean
+    Dim rstLogAdd As String
+    
+    rstLogAdd = "INSERT INTO " & LogName & " ( txtParentID, txtActivity, txtActivityID, txtReason, dtActivityStamp, fkUserID ) " & _
+                "SELECT '" & ParentID & "', '" & Activity & "', '" & ActivityID & "', '" & ActReason & "', '" & DateStamp & "', " & UserID & "; "
+
+    Debug.Print rstLogAdd
+    BeginTrans
+    CurrentDb.Execute rstLogAdd, dbFailOnError
+    CommitTrans
+
+End Function
+
+Function LogDetails(LogName As String, ActivityID As String, FieldName As String, NewValue As String) As Boolean
+    Dim rstLogAdd As String
+    
+    rstLogAdd = "INSERT INTO " & LogName & " ( fkActivityID, txtFieldName, txtNewValue ) " & _
+                "SELECT '" & ActivityID & "', '" & FieldName & "', '" & NewValue & "' ; "
+    
+    Debug.Print rstLogAdd
+    
+    BeginTrans
+    CurrentDb.Execute rstLogAdd, dbFailOnError
+    CommitTrans
+End Function
+
+Private Function ResizeForm(MyRows As Long)
+    'tbVtNote Max Row + 543 (TWPS)
+    'tabActivity.Height tbVtNote.Top + 1 - .2188 + .1312
+    'Detail.Height = '(.2188 + .259)' .4778 + tabActivity.Height
+    Dim Movement As Long
+    Select Case MyRows
+        Case 1
+            Movement = Row2Top
+        Case 2
+            Movement = Row3Top
+        Case 3
+            Movement = Row3Top + NewRow
+     End Select
+     
+    With Me
+        .chkFloodJobs.Top = (Movement - 792)
+        .Label_FloodJobs.Top = (Movement - 936)
+        .tbVtNote.Top = (Movement - 279)
+        '.Jobs_Page.Height = .tbNotesVT.Top + 2460 '4495
+        .tabActivity.Height = .tbVtNote.Top + 1314
+        .Detail.Height = .tabActivity.Height + 373
+        .InsideHeight = .Detail.Height + .FormHeader.Height + 320 '6510
+    End With
+End Function
+
+Private Sub Form_Close()
+    CancelAndCloseForm Me
+    OldStatus = 0
+    OldLabeler = 0
+    OldReviewer = 0
+End Sub
+
+Private Sub Form_Load()
+    ResizeForm 1
+    Dim args
+    args = Split(Me.OpenArgs, "|")
+    
+    Select Case args(0)
+        Case 0
+        Case Else
+            Me.cbAction.RowSource = "SELECT tblActions.ID, tblActions.txtAction, tblActions.txtDescriptionForm FROM tblActions WHERE tblActions.ID = " & args(0) & ";"
+            Me.cbAction.Locked = True
+            'Me.cbAction.Enabled = False
+     End Select
+    OldStatus = Me.cbStatus
+    OldLabeler = Me.cbAssignedTo
+    OldReviewer = Me.cbDivReviewer
+    
+    ObjectID = Me.anSubmissionID
+    ObjectText = Me.stSubmissionEntry
+    BeginChangeTrack Me, 1
+    cbAction_AfterUpdate
+    
+End Sub
+
+Private Sub tbSubNotes_AfterUpdate()
+    If Me.tbSubNotes = "" Or IsNull(Me.tbSubNotes) Then
+        Me.chkIncludeNotesVT.Enabled = False
+        Me.chkIncludeNotesVT = Null
+     End If
+    SummaryTest Me
+End Sub
+
+Private Sub tbSubNotes_Change()
+    Me.chkIncludeNotesVT.Enabled = True
+    If Me.cbAction = 2 Then
+        Me.chkIncludeNotesVT = True
+        SendToVT = True
+     End If
+End Sub

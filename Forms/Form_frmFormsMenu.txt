@@ -1,0 +1,56 @@
+Option Compare Database
+
+Private Sub Detail_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    ClearAll True, Me, "bleh"
+End Sub
+
+Private Sub Form_Activate()
+    'Changed the Activate(1000)/Deactivate(0 to 5000) Ratio the DetectStatus Form's Timer to run through this form/module 2/9/2016
+    Me.TimerInterval = 1000
+End Sub
+
+'will want to replicate for the other hidden forms
+Private Sub Form_Close()
+    ShutDown
+End Sub
+
+Private Sub Form_Deactivate()
+    'Altered from 0 to 10000 because I eliminated the DetectStatus Form's Timer in favor of running through one form this form/module 2/9/2016
+    Me.TimerInterval = 10000
+End Sub
+
+Private Sub Form_Load()
+    DoCmd.RunCommand acCmdSizeToFitForm
+    Me.lbl_Version.Caption = useLocalVar("lv_sDBVersion")
+    Me.lbl_Version.Caption = Left(Me.lbl_Version.Caption, Len(Me.lbl_Version.Caption) - Len(".accdb"))
+End Sub
+
+Private Sub Form_Timer()
+    Me.Auto_Time.Requery
+    FormTimer Me.TimerInterval
+End Sub
+
+Private Sub hlk_Exit_Click()
+    DoCmd.Close acForm, Me.Name
+    DoCmd.RunCommand acCmdExit
+End Sub
+
+Private Sub hlk_Exit_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "hlk_Exit", Me, 9513224
+End Sub
+
+Private Sub hlkContactLists_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "hlkContactLists", Me, 16777215
+End Sub
+
+Private Sub hlkJobLog_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "hlkJobLog", Me, 16777215
+End Sub
+
+Private Sub hlkNewSubmission_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "hlkNewSubmission", Me, 16777215
+End Sub
+
+Private Sub hlkReviewEditSub_MouseMove(Button As Integer, Shift As Integer, X As Single, Y As Single)
+    Highlight "hlkReviewEditSub", Me, 16777215
+End Sub
